@@ -319,7 +319,28 @@ class SwissEph {
   
   // Initializes the Swiss Ephemeris WebAssembly module
   async initSwissEph() {
-    this.SweModule = await WasamSwissEph();
+    let moduleConfig = {};
+    
+    // In Node.js environment, we need to help locate the WASM and data files
+    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+      try {
+        const { fileURLToPath } = await import('url');
+        const { dirname, join } = await import('path');
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        
+        moduleConfig.locateFile = (path, prefix) => {
+          if (path.endsWith('.data') || path.endsWith('.wasm')) {
+            return join(__dirname, '../wsam', path);
+          }
+          return prefix + path;
+        };
+      } catch (e) {
+        console.warn('Failed to configure path resolution for SwissEph WASM:', e);
+      }
+    }
+
+    this.SweModule = await WasamSwissEph(moduleConfig);
     this.set_ephe_path('sweph');
   }
 

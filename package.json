@@ -1,6 +1,6 @@
 {
   "name": "swisseph-wasm",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "High-precision Swiss Ephemeris WebAssembly library for astronomical calculations in JavaScript",
   "type": "module",
   "main": "src/swisseph.js",
