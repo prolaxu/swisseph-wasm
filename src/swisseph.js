@@ -349,6 +349,12 @@ class SwissEph {
     }
 
     this.SweModule = await WasamSwissEph(moduleConfig);
+
+    // Ensure HEAP32 is available
+    if (!this.SweModule.HEAP32) {
+      this.SweModule.HEAP32 = new Int32Array(this.SweModule.HEAPF64.buffer);
+    }
+    
     this.set_ephe_path('sweph');
   }
 
@@ -357,18 +363,95 @@ class SwissEph {
   }
 
   house_pos(armc, geoLat, eps, hsys, lon, lat) {
-    return this.SweModule.ccall('swe_houses_pos', 'number', ['number', 'number', 'number', 'string', 'number', 'number'], [armc, geoLat, eps, hsys, lon, lat]);
+    const xpinPtr = this.SweModule._malloc(2 * 8);
+    const HEAPF64 = this.SweModule.HEAPF64;
+    HEAPF64[xpinPtr >> 3] = lon;
+    HEAPF64[(xpinPtr >> 3) + 1] = lat;
+    
+    const serr = this.SweModule._malloc(256);
+    const result = this.SweModule.ccall(
+      'swe_house_pos',
+      'number',
+      ['number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [armc, geoLat, eps, hsys.charCodeAt(0), xpinPtr, serr]
+    );
+    
+    this.SweModule._free(xpinPtr);
+    this.SweModule._free(serr);
+    return result;
   }
 
   julday(year, month, day, hour) {
     return this.SweModule.ccall('swe_julday', 'number', ['number', 'number', 'number', 'number', 'number'], [year, month, day, hour, 1]);
   }
+  
+  date_conversion(year, month, day, hour, calendar) {
+    const tjdPtr = this.SweModule._malloc(8);
+    // calendar is a char, pass char code
+    const result = this.SweModule.ccall(
+      'swe_date_conversion',
+      'number',
+      ['number', 'number', 'number', 'number', 'number', 'pointer'],
+      [year, month, day, hour, calendar.charCodeAt(0), tjdPtr]
+    );
+    const tjd = this.SweModule.HEAPF64[tjdPtr >> 3];
+    this.SweModule._free(tjdPtr);
+    
+    if (result === this.ERR) {
+      throw new Error("Invalid date");
+    }
+    return tjd;
+  }
+
+  revjul(julianDay, gregflag) {
+    const yearPtr = this.SweModule._malloc(4);
+    const monthPtr = this.SweModule._malloc(4);
+    const dayPtr = this.SweModule._malloc(4);
+    const hourPtr = this.SweModule._malloc(8);
+    
+    this.SweModule.ccall(
+      'swe_revjul',
+      'void',
+      ['number', 'number', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [julianDay, gregflag, yearPtr, monthPtr, dayPtr, hourPtr]
+    );
+
+    const year = this.SweModule.HEAP32[yearPtr >> 2];
+    const month = this.SweModule.HEAP32[monthPtr >> 2];
+    const day = this.SweModule.HEAP32[dayPtr >> 2];
+    const hour = this.SweModule.HEAPF64[hourPtr >> 3];
+    
+    this.SweModule._free(yearPtr);
+    this.SweModule._free(monthPtr);
+    this.SweModule._free(dayPtr);
+    this.SweModule._free(hourPtr);
+    
+    return { year, month, day, hour };
+  }
 
   calc_ut(julianDay, body, flags) {
-    const buffer = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
-    this.SweModule.ccall('swe_calc_ut', 'number', ['number', 'number', 'number','pointer'], [julianDay, body, flags,buffer]);
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, buffer, 4);
-    this.SweModule._free(buffer);
+    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+    const errorBuffer = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
+      'swe_calc_ut',
+      'number',
+      ['number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, body, flags, resultPtr, errorBuffer]
+    );
+
+    if (retFlag < 0) {
+      const error = this.SweModule.UTF8ToString(errorBuffer);
+      this.SweModule._free(resultPtr);
+      this.SweModule._free(errorBuffer);
+      throw new Error(`Error in swe_calc_ut: ${error}`);
+    }
+
+    // Copy data to a safe array before freeing memory
+    const start = resultPtr / 8;
+    const result = this.SweModule.HEAPF64.slice(start, start + 6);
+    
+    this.SweModule._free(resultPtr);
+    this.SweModule._free(errorBuffer);
     return result;
   }
 
@@ -377,7 +460,13 @@ class SwissEph {
   }
 
   time_equ(julianDay) {
-    return this.SweModule.ccall('swe_time_equ', 'number', ['number'], [julianDay]);
+    const tePtr = this.SweModule._malloc(8);
+    const serr = this.SweModule._malloc(256);
+    this.SweModule.ccall('swe_time_equ', 'number', ['number', 'pointer', 'pointer'], [julianDay, tePtr, serr]);
+    const result = this.SweModule.HEAPF64[tePtr >> 3];
+    this.SweModule._free(tePtr);
+    this.SweModule._free(serr);
+    return result;
   }
 
   sidtime0(julianDay, eps, nut) {
@@ -408,8 +497,8 @@ class SwissEph {
     return this.SweModule.ccall('swe_degnorm', 'number', ['number'], [x]);
   }
 
-  radnorm(x) {
-    return this.SweModule.ccall('swe_radnorm', 'number', ['number'], [x]);
+  radnorm(angle) {
+    return this.SweModule.ccall('swe_radnorm', 'number', ['number'], [angle]);
   }
 
   rad_midp(x1, x2) {
@@ -421,17 +510,37 @@ class SwissEph {
   }
 
   split_deg(ddeg, roundFlag) {
-    const resultPtr = this.SweModule._malloc(5 * Float64Array.BYTES_PER_ELEMENT);
-    this.SweModule.ccall('swe_split_deg', 'void', ['number', 'number', 'pointer'], [ddeg, roundFlag, resultPtr]);
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 5);
-    this.SweModule._free(resultPtr);
-    return {
-      degree: result[0],
-      min: result[1],
-      second: result[2],
-      fraction: result[3],
-      sign: result[4],
+    const degPtr = this.SweModule._malloc(4);
+    const minPtr = this.SweModule._malloc(4);
+    const secPtr = this.SweModule._malloc(4);
+    const dsecfrPtr = this.SweModule._malloc(8);
+    const isgnPtr = this.SweModule._malloc(4);
+    
+    this.SweModule.ccall(
+      'swe_split_deg',
+      'void',
+      ['number', 'number', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [ddeg, roundFlag, degPtr, minPtr, secPtr, dsecfrPtr, isgnPtr]
+    );
+    
+    const HEAP32 = new Int32Array(this.SweModule.HEAPF64.buffer);
+    const HEAPF64 = new Float64Array(this.SweModule.HEAPF64.buffer);
+    
+    const result = {
+      degree: HEAP32[degPtr >> 2],
+      min: HEAP32[minPtr >> 2],
+      second: HEAP32[secPtr >> 2],
+      fraction: HEAPF64[dsecfrPtr >> 3],
+      sign: HEAP32[isgnPtr >> 2],
     };
+    
+    this.SweModule._free(degPtr);
+    this.SweModule._free(minPtr);
+    this.SweModule._free(secPtr);
+    this.SweModule._free(dsecfrPtr);
+    this.SweModule._free(isgnPtr);
+    
+    return result;
   }
 
   csnorm(p) {
@@ -482,33 +591,7 @@ class SwissEph {
     return this.SweModule.ccall('swe_cs2degstr', 'string', ['number'], [t]);
   }
 
-  date_conversion(year, month, day, hour, gregflag) {
-    const julianDay = this.SweModule.ccall(
-      'swe_date_conversion',
-      'number',
-      ['number', 'number', 'number', 'number', 'number'],
-      [year, month, day, hour, gregflag]
-    );
-    return julianDay;
-  }
 
-  revjul(julianDay, gregflag) {
-    const buffer = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
-    this.SweModule.ccall(
-      'swe_revjul',
-      'void',
-      ['number', 'number', 'pointer'],
-      [julianDay, gregflag, buffer]
-    );
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, buffer, 4);
-    this.SweModule._free(buffer);
-    return {
-      year: result[0],
-      month: result[1],
-      day: result[2],
-      hour: result[3],
-    };
-  }
 
   utc_to_jd(year, month, day, hour, minute, second, gregflag) {
     const resultPtr = this.SweModule._malloc(2 * Float64Array.BYTES_PER_ELEMENT);
@@ -527,67 +610,122 @@ class SwissEph {
   }
 
   jdet_to_utc(julianDay, gregflag) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+    const yearPtr = this.SweModule._malloc(4);
+    const monthPtr = this.SweModule._malloc(4);
+    const dayPtr = this.SweModule._malloc(4);
+    const hourPtr = this.SweModule._malloc(4);
+    const minPtr = this.SweModule._malloc(4);
+    const secPtr = this.SweModule._malloc(8);
+    
     this.SweModule.ccall(
       'swe_jdet_to_utc',
       'void',
-      ['number', 'number', 'pointer'],
-      [julianDay, gregflag, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [julianDay, gregflag, yearPtr, monthPtr, dayPtr, hourPtr, minPtr, secPtr]
     );
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
-    this.SweModule._free(resultPtr);
-    return {
-      year: result[0],
-      month: result[1],
-      day: result[2],
-      hour: result[3],
-      minute: result[4],
-      second: result[5],
+    
+    const HEAP32 = new Int32Array(this.SweModule.HEAPF64.buffer);
+    const HEAPF64 = new Float64Array(this.SweModule.HEAPF64.buffer);
+    
+    const result = {
+      year: HEAP32[yearPtr >> 2],
+      month: HEAP32[monthPtr >> 2],
+      day: HEAP32[dayPtr >> 2],
+      hour: HEAP32[hourPtr >> 2],
+      minute: HEAP32[minPtr >> 2],
+      second: HEAPF64[secPtr >> 3],
     };
+    
+    this.SweModule._free(yearPtr);
+    this.SweModule._free(monthPtr);
+    this.SweModule._free(dayPtr);
+    this.SweModule._free(hourPtr);
+    this.SweModule._free(minPtr);
+    this.SweModule._free(secPtr);
+    
+    return result;
   }
 
   jdut1_to_utc(julianDay, gregflag) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+    const yearPtr = this.SweModule._malloc(4);
+    const monthPtr = this.SweModule._malloc(4);
+    const dayPtr = this.SweModule._malloc(4);
+    const hourPtr = this.SweModule._malloc(4);
+    const minPtr = this.SweModule._malloc(4);
+    const secPtr = this.SweModule._malloc(8);
+    
     this.SweModule.ccall(
       'swe_jdut1_to_utc',
       'void',
-      ['number', 'number', 'pointer'],
-      [julianDay, gregflag, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [julianDay, gregflag, yearPtr, monthPtr, dayPtr, hourPtr, minPtr, secPtr]
     );
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
-    this.SweModule._free(resultPtr);
-    return {
-      year: result[0],
-      month: result[1],
-      day: result[2],
-      hour: result[3],
-      minute: result[4],
-      second: result[5],
+    
+    const HEAP32 = new Int32Array(this.SweModule.HEAPF64.buffer);
+    const HEAPF64 = new Float64Array(this.SweModule.HEAPF64.buffer);
+    
+    const result = {
+      year: HEAP32[yearPtr >> 2],
+      month: HEAP32[monthPtr >> 2],
+      day: HEAP32[dayPtr >> 2],
+      hour: HEAP32[hourPtr >> 2],
+      minute: HEAP32[minPtr >> 2],
+      second: HEAPF64[secPtr >> 3],
     };
+    
+    this.SweModule._free(yearPtr);
+    this.SweModule._free(monthPtr);
+    this.SweModule._free(dayPtr);
+    this.SweModule._free(hourPtr);
+    this.SweModule._free(minPtr);
+    this.SweModule._free(secPtr);
+    
+    return result;
   }
 
   utc_time_zone(year, month, day, hour, minute, second, timezone) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+    const yearPtr = this.SweModule._malloc(4);
+    const monthPtr = this.SweModule._malloc(4);
+    const dayPtr = this.SweModule._malloc(4);
+    const hourPtr = this.SweModule._malloc(4);
+    const minPtr = this.SweModule._malloc(4);
+    const secPtr = this.SweModule._malloc(8);
+    
     this.SweModule.ccall(
       'swe_utc_time_zone',
       'void',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [year, month, day, hour, minute, second, timezone, resultPtr]
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [year, month, day, hour, minute, second, timezone, yearPtr, monthPtr, dayPtr, hourPtr, minPtr, secPtr]
     );
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
-    this.SweModule._free(resultPtr);
-    return {
-      year: result[0],
-      month: result[1],
-      day: result[2],
-      hour: result[3],
-      minute: result[4],
-      second: result[5],
+    
+    const HEAP32 = new Int32Array(this.SweModule.HEAPF64.buffer);
+    const HEAPF64 = new Float64Array(this.SweModule.HEAPF64.buffer);
+    
+    const result = {
+      year: HEAP32[yearPtr >> 2],
+      month: HEAP32[monthPtr >> 2],
+      day: HEAP32[dayPtr >> 2],
+      hour: HEAP32[hourPtr >> 2],
+      minute: HEAP32[minPtr >> 2],
+      second: HEAPF64[secPtr >> 3],
     };
+    
+    this.SweModule._free(yearPtr);
+    this.SweModule._free(monthPtr);
+    this.SweModule._free(dayPtr);
+    this.SweModule._free(hourPtr);
+    this.SweModule._free(minPtr);
+    this.SweModule._free(secPtr);
+    
+    return result;
   }
 
   version() {
-    return this.SweModule.ccall('swe_version', 'string', [], []);
+    const bufPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall('swe_version', 'void', ['pointer'], [bufPtr]);
+    const version = this.SweModule.UTF8ToString(bufPtr);
+    this.SweModule._free(bufPtr);
+    return version;
   }
 
   calc(julianDay, body, flags) {
@@ -605,7 +743,7 @@ class SwissEph {
       this.SweModule._free(errorBuffer);
       throw new Error(`Error in swe_calc: ${error}`);
     }
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
     this.SweModule._free(resultPtr);
     this.SweModule._free(errorBuffer);
     return {
@@ -624,6 +762,22 @@ class SwissEph {
     this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
     const retFlag = this.SweModule.ccall(
       'swe_fixstar',
+      'number',
+      ['pointer', 'number', 'number', 'pointer'],
+      [starBuffer, julianDay, flags, resultPtr]
+    );
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
+    this.SweModule._free(starBuffer);
+    this.SweModule._free(resultPtr);
+    return retFlag < 0 ? null : results;
+  }
+
+  fixstar_ut(star, julianDay, flags) {
+    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+    const starBuffer = this.SweModule._malloc(star.length + 1);
+    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
+    const retFlag = this.SweModule.ccall(
+      'swe_fixstar_ut',
       'number',
       ['pointer', 'number', 'number', 'pointer'],
       [starBuffer, julianDay, flags, resultPtr]
@@ -716,12 +870,11 @@ class SwissEph {
   }
 
   get_planet_name(planetId) {
-    return this.SweModule.ccall(
-      'swe_get_planet_name',
-      'string',
-      ['number'],
-      [planetId]
-    );
+    const bufPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall('swe_get_planet_name', 'void', ['number', 'pointer'], [planetId, bufPtr]);
+    const name = this.SweModule.UTF8ToString(bufPtr);
+    this.SweModule._free(bufPtr);
+    return name;
   }
 
   set_topo(longitude, latitude, altitude) {
@@ -859,48 +1012,103 @@ class SwissEph {
   }
 
   houses(julianDay, geoLat, geoLon, houseSystem) {
-    return this.SweModule.ccall(
+    const cuspsPtr = this.SweModule._malloc(13 * 8); // 13 doubles
+    const ascmcPtr = this.SweModule._malloc(10 * 8); // 10 doubles
+    
+    this.SweModule.ccall(
       'swe_houses',
       'number',
-      ['number', 'number', 'number', 'string'],
-      [julianDay, geoLat, geoLon, houseSystem]
+      ['number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, geoLat, geoLon, houseSystem.charCodeAt(0), cuspsPtr, ascmcPtr]
     );
+
+    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
+    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
+    
+    this.SweModule._free(cuspsPtr);
+    this.SweModule._free(ascmcPtr);
+    
+    return { cusps, ascmc };
   }
 
   houses_ex(julianDay, iflag, geoLat, geoLon, houseSystem) {
-    return this.SweModule.ccall(
+    const cuspsPtr = this.SweModule._malloc(13 * 8);
+    const ascmcPtr = this.SweModule._malloc(10 * 8);
+    
+    this.SweModule.ccall(
       'swe_houses_ex',
       'number',
-      ['number', 'number', 'number', 'number', 'string'],
-      [julianDay, iflag, geoLat, geoLon, houseSystem]
+      ['number', 'number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, iflag, geoLat, geoLon, houseSystem.charCodeAt(0), cuspsPtr, ascmcPtr]
     );
+
+    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
+    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
+    
+    this.SweModule._free(cuspsPtr);
+    this.SweModule._free(ascmcPtr);
+    
+    return { cusps, ascmc };
   }
 
   houses_ex2(julianDay, iflag, geoLat, geoLon, houseSystem) {
-    return this.SweModule.ccall(
+    const cuspsPtr = this.SweModule._malloc(13 * 8);
+    const ascmcPtr = this.SweModule._malloc(10 * 8);
+    
+    this.SweModule.ccall(
       'swe_houses_ex2',
       'number',
-      ['number', 'number', 'number', 'number', 'string'],
-      [julianDay, iflag, geoLat, geoLon, houseSystem]
+      ['number', 'number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, iflag, geoLat, geoLon, houseSystem.charCodeAt(0), cuspsPtr, ascmcPtr]
     );
+
+    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
+    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
+    
+    this.SweModule._free(cuspsPtr);
+    this.SweModule._free(ascmcPtr);
+    
+    return { cusps, ascmc };
   }
 
   houses_armc(armc, geoLat, eps, houseSystem) {
-    return this.SweModule.ccall(
+    const cuspsPtr = this.SweModule._malloc(13 * 8);
+    const ascmcPtr = this.SweModule._malloc(10 * 8);
+    
+    this.SweModule.ccall(
       'swe_houses_armc',
       'number',
-      ['number', 'number', 'number', 'string'],
-      [armc, geoLat, eps, houseSystem]
+      ['number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [armc, geoLat, eps, houseSystem.charCodeAt(0), cuspsPtr, ascmcPtr]
     );
+
+    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
+    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
+    
+    this.SweModule._free(cuspsPtr);
+    this.SweModule._free(ascmcPtr);
+    
+    return { cusps, ascmc };
   }
 
   houses_armc_ex2(armc, geoLat, eps, houseSystem) {
-    return this.SweModule.ccall(
+    const cuspsPtr = this.SweModule._malloc(13 * 8);
+    const ascmcPtr = this.SweModule._malloc(10 * 8);
+    
+    this.SweModule.ccall(
       'swe_houses_armc_ex2',
       'number',
-      ['number', 'number', 'number', 'string'],
-      [armc, geoLat, eps, houseSystem]
+      ['number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [armc, geoLat, eps, houseSystem.charCodeAt(0), cuspsPtr, ascmcPtr]
     );
+
+    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
+    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
+    
+    this.SweModule._free(cuspsPtr);
+    this.SweModule._free(ascmcPtr);
+    
+    return { cusps, ascmc };
   }
 
   sol_eclipse_where(julianDay, flags) {
@@ -1103,30 +1311,94 @@ class SwissEph {
     );
   }
 
-  azal(julianDay, geoLat, geoLon, altitude, planet) {
-    const resultPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
-    const retFlag = this.SweModule.ccall(
-      'swe_azalt',
+  houses(julianDay, geoLat, geoLon, houseSystem) {
+    const cuspsPtr = this.SweModule._malloc(13 * 8); // 13 doubles
+    const ascmcPtr = this.SweModule._malloc(10 * 8); // 10 doubles
+    
+    this.SweModule.ccall(
+      'swe_houses',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, geoLat, geoLon, altitude, planet, resultPtr]
+      ['number', 'number', 'number', 'string', 'pointer', 'pointer'],
+      [julianDay, geoLat, geoLon, houseSystem, cuspsPtr, ascmcPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+
+    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
+    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
+    
+    this.SweModule._free(cuspsPtr);
+    this.SweModule._free(ascmcPtr);
+    
+    return { cusps, ascmc };
   }
 
-  azal_rev(julianDay, geoLat, geoLon, altitude, planet) {
-    const resultPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
-    const retFlag = this.SweModule.ccall(
-      'swe_azalt_rev',
-      'number',
-      ['number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, geoLat, geoLon, altitude, planet, resultPtr]
+  azalt(tjd_ut, calc_flag, geopos, atpress, attemp, xin) {
+    const xazPtr = this.SweModule._malloc(3 * 8);
+    const xinPtr = this.SweModule._malloc(3 * 8);
+    const geoposPtr = this.SweModule._malloc(3 * 8);
+    
+    // Copy input coordinates
+    const HEAPF64 = this.SweModule.HEAPF64;
+    HEAPF64[xinPtr >> 3] = xin[0];
+    HEAPF64[(xinPtr >> 3) + 1] = xin[1];
+    HEAPF64[(xinPtr >> 3) + 2] = xin[2];
+    
+    HEAPF64[geoposPtr >> 3] = geopos[0];
+    HEAPF64[(geoposPtr >> 3) + 1] = geopos[1];
+    HEAPF64[(geoposPtr >> 3) + 2] = geopos[2];
+    
+    this.SweModule.ccall(
+      'swe_azalt',
+      'void',
+      ['number', 'number', 'pointer', 'number', 'number', 'pointer', 'pointer'],
+      [tjd_ut, calc_flag, geoposPtr, atpress, attemp, xinPtr, xazPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    
+    const result = {
+      azimuth: HEAPF64[xazPtr >> 3],
+      trueAltitude: HEAPF64[(xazPtr >> 3) + 1],
+      apparentAltitude: HEAPF64[(xazPtr >> 3) + 2],
+    };
+    
+    this.SweModule._free(xazPtr);
+    this.SweModule._free(xinPtr);
+    this.SweModule._free(geoposPtr);
+    
+    return result;
+  }
+
+  azalt_rev(tjd_ut, calc_flag, geopos, xin) {
+    const xoutPtr = this.SweModule._malloc(3 * 8);
+    const xinPtr = this.SweModule._malloc(3 * 8);
+    const geoposPtr = this.SweModule._malloc(3 * 8);
+    
+    // Copy input coordinates
+    const HEAPF64 = this.SweModule.HEAPF64;
+    HEAPF64[xinPtr >> 3] = xin[0];
+    HEAPF64[(xinPtr >> 3) + 1] = xin[1];
+    HEAPF64[(xinPtr >> 3) + 2] = xin[2];
+    
+    HEAPF64[geoposPtr >> 3] = geopos[0];
+    HEAPF64[(geoposPtr >> 3) + 1] = geopos[1];
+    HEAPF64[(geoposPtr >> 3) + 2] = geopos[2];
+    
+    this.SweModule.ccall(
+      'swe_azalt_rev',
+      'void',
+      ['number', 'number', 'pointer', 'pointer', 'pointer'],
+      [tjd_ut, calc_flag, geoposPtr, xinPtr, xoutPtr]
+    );
+    
+    const result = {
+      ra: HEAPF64[xoutPtr >> 3],
+      dec: HEAPF64[(xoutPtr >> 3) + 1],
+      distance: HEAPF64[(xoutPtr >> 3) + 2],
+    };
+    
+    this.SweModule._free(xoutPtr);
+    this.SweModule._free(xinPtr);
+    this.SweModule._free(geoposPtr);
+    
+    return result;
   }
 
   rise_trans(julianDay, planet, longitude, latitude, altitude, flags) {

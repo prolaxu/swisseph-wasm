@@ -23,10 +23,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-    "prepublishOnly": "npm test",
+    "test": "node tests/swisseph.test.js",
+    "prepublishOnly": "node tests/swisseph.test.js",
     "demo": "python3 -m http.server 8000",
     "docs": "echo 'Documentation available in DOCUMENTATION.md'"
   },
@@ -64,12 +62,5 @@
   },
   "browser": {
     "src/swisseph.js": "./src/swisseph.js"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.22.0",
-    "@babel/preset-env": "^7.22.0",
-    "babel-jest": "^29.5.0",
-    "jest": "^29.5.0",
-    "jest-environment-jsdom": "^29.5.0"
   }
 }

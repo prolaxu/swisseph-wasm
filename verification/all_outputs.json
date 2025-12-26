@@ -1,0 +1,85 @@
+{
+  "date_time": {
+    "julday": 2451545.000000000000000,
+    "revjul": {"year": 2000, "month": 1, "day": 1, "hour": 12.000000000000000},
+    "date_conversion": {"retval": 0, "jd": 2451545.000000000000000},
+    "utc_to_jd": {"retval": 0, "et": 2451545.000742870382965, "ut": 2451545.000004109926522},
+    "jdet_to_utc": {"year": 2000, "month": 1, "day": 1},
+    "jdut1_to_utc": {"year": 2000, "month": 1, "day": 1},
+    "utc_time_zone": {"year": 2000, "hour": 11},
+    "deltat": 0.000738760589493,
+    "time_equ": -0.002281427250050,
+    "sidtime": 18.697138162535065,
+    "sidtime0": 18.697374867705111,
+    "day_of_week": 5
+  },
+  "planets": {
+    "calc_sun": {"retval": 4, "lon": 280.368166558278062, "lat": 0.000232331812238},
+    "calc_ut_moon": {"retval": 4, "lon": 223.323775438409569, "lat": 5.170815468996154},
+    "get_planet_name": "Sun"
+  },
+  "stars": {
+    "fixstar": {"retval": -1, "lon": 0.000000000000000},
+    "fixstar_ut": {"retval": -1, "lon": 0.000000000000000},
+    "fixstar_mag": {"retval": -1, "mag": 0.000000000000000},
+    "fixstar2": {"retval": -1, "lon": 0.000000000000000},
+    "fixstar2_ut": {"retval": -1, "lon": 0.000000000000000},
+    "fixstar2_mag": {"retval": -1, "mag": 0.000000000000000}
+  },
+  "houses": {
+    "houses": {"retval": 0, "cusp1": 35.505255562843416, "asc": 35.505255562843416},
+    "houses_ex": {"retval": 0, "cusp1": 35.505255562843416},
+    "houses_ex2": {"retval": 0, "cusp1": 35.505255562843416},
+    "houses_armc": {"retval": 0, "cusp1": 122.256912333819429},
+    "houses_armc_ex2": {"retval": 0, "cusp1": 122.256912333819429},
+    "house_pos": 12.275692638590355
+  },
+  "math": {
+    "degnorm": 10.000000000000000,
+    "radnorm": 0.100000000000000,
+    "rad_midp": 0.008407346410206,
+    "deg_midp": 0.000000000000000,
+    "split_deg": {"deg": 123, "min": 27, "sec": 22},
+    "csnorm": 370,
+    "difcsn": 129599660,
+    "difdegn": 20.000000000000000,
+    "difcs2n": -340,
+    "difdeg2n": 20.000000000000000,
+    "difrad2n": 0.183185307179586,
+    "csroundsec": 100,
+    "d2l": 123
+  },
+  "transforms": {
+    "cotrans": {"x": 9.189465231495113, "y": -3.960874341250659},
+    "cotrans_sp": {"x": 9.189465231495113, "y": -3.960874341250659}
+  },
+  "ayanamsa": {
+    "get_ayanamsa": 23.857092325455199,
+    "get_ayanamsa_ut": 23.857092353708822,
+    "get_ayanamsa_ex": 23.853222456319372,
+    "get_ayanamsa_ex_ut": 23.853222486029065,
+    "get_ayanamsa_name": "Lahiri"
+  },
+  "phenomena": {
+    "pheno": {"retval": 4, "phase_angle": 122.663712126200622},
+    "pheno_ut": {"retval": 4, "phase_angle": 122.671811930407245},
+    "azalt": {"az": 189.888587573857478, "alt": -32.502463605571080},
+    "azalt_rev": {"ra": 100.000000000000000, "dec": 10.000000000000011},
+    "refrac": 10.088848271817637,
+    "refrac_extended": 10.086731909514448
+  },
+  "config": {
+    "get_tid_acc": -25.579999999999998,
+    "set_tid_acc_done": true
+  },
+  "nodes": {
+    "nod_aps": {"retval": 0, "node_lon": 125.040685175309477},
+    "nod_aps_ut": {"retval": 0, "node_lon": 125.040646056616055}
+  },
+  "strings": {
+    "cs2timestr": "00 00",
+    "cs2lonlatstr": "0E00'01",
+    "cs2degstr": " 0°00'01"
+  },
+  "version": "2.10.03"
+}
