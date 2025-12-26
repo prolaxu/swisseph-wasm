@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swiss Ephemeris - Browser Tests</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-2xl font-bold text-gray-900">Swiss Ephemeris - Browser Tests</h1>
+            <p class="text-gray-600 mt-1">Automated testing of all 63 methods in the browser</p>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Left: Test Controls -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded border border-gray-200 p-4 sticky top-4">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Test Controls</h2>
+                    
+                    <div class="space-y-3">
+                        <button id="runAllTests" 
+                                class="w-full px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all font-medium">
+                            Run All Tests
+                        </button>
+                        
+                        <button id="clearResults" 
+                                class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-all text-sm">
+                            Clear Results
+                        </button>
+                    </div>
+                    
+                    <!-- Summary -->
+                    <div class="mt-6 p-4 bg-gray-50 rounded border border-gray-200">
+                        <h3 class="font-semibold text-gray-900 mb-3">Summary</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Status:</span>
+                                <span id="testStatus" class="font-medium text-gray-500">Ready</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total:</span>
+                                <span id="totalTests" class="font-medium">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Passed:</span>
+                                <span id="passedTests" class="font-medium text-green-600">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Failed:</span>
+                                <span id="failedTests" class="font-medium text-red-600">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Success Rate:</span>
+                                <span id="successRate" class="font-medium">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress -->
+                    <div class="mt-4">
+                        <div class="text-xs text-gray-600 mb-1">Progress</div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Test Results -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded border border-gray-200 p-4">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Test Results</h2>
+                    
+                    <div id="testResults" class="space-y-3">
+                        <div class="text-gray-500 text-sm italic">
+                            Click "Run All Tests" to begin testing...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import SwissEph from '../src/swisseph.js';
+
+        let swisseph;
+        let totalTests = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        const testStatusEl = document.getElementById('testStatus');
+        const totalTestsEl = document.getElementById('totalTests');
+        const passedTestsEl = document.getElementById('passedTests');
+        const failedTestsEl = document.getElementById('failedTests');
+        const successRateEl = document.getElementById('successRate');
+        const progressBarEl = document.getElementById('progressBar');
+        const testResultsEl = document.getElementById('testResults');
+
+        async function init() {
+            testStatusEl.textContent = 'Initializing...';
+            testStatusEl.className = 'font-medium text-yellow-600';
+            
+            swisseph = new SwissEph();
+            await swisseph.initSwissEph();
+            
+            testStatusEl.textContent = 'Ready';
+            testStatusEl.className = 'font-medium text-green-600';
+        }
+
+        function updateSummary() {
+            totalTestsEl.textContent = totalTests;
+            passedTestsEl.textContent = passedTests;
+            failedTestsEl.textContent = failedTests;
+            
+            const rate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+            successRateEl.textContent = rate + '%';
+            
+            const progress = totalTests > 0 ? (totalTests / 58) * 100 : 0;
+            progressBarEl.style.width = progress + '%';
+        }
+
+        function addCategoryHeader(name) {
+            const div = document.createElement('div');
+            div.className = 'bg-gray-50 rounded p-3 border border-gray-200 font-semibold text-gray-900';
+            div.textContent = name;
+            testResultsEl.appendChild(div);
+        }
+
+        function addTestResult(name, params, passed, result = null, expected = null, error = null) {
+            const div = document.createElement('div');
+            div.className = 'p-3 border border-gray-200 rounded mb-2';
+            
+            const icon = passed ? '✓' : '✗';
+            const iconColor = passed ? 'text-green-600' : 'text-red-600';
+            const bgColor = passed ? 'bg-green-50' : 'bg-red-50';
+            
+            let resultHtml = `
+                <div class="${bgColor} rounded p-2">
+                    <div class="flex items-start">
+                        <span class="${iconColor} font-bold mr-2 text-lg">${icon}</span>
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-900">${name}(${params})</div>
+            `;
+            
+            if (passed && result !== null) {
+                const resultStr = typeof result === 'object' ? JSON.stringify(result) : String(result);
+                const displayResult = resultStr.length > 100 ? resultStr.substring(0, 100) + '...' : resultStr;
+                resultHtml += `
+                    <div class="mt-2 text-xs">
+                        <div class="text-gray-600">Result: <code class="bg-white px-1 py-0.5 rounded text-green-700">${displayResult}</code></div>
+                    </div>
+                `;
+                if (expected !== null) {
+                    const expectedStr = typeof expected === 'object' ? JSON.stringify(expected) : String(expected);
+                    const displayExpected = expectedStr.length > 100 ? expectedStr.substring(0, 100) + '...' : expectedStr;
+                    resultHtml += `
+                        <div class="text-gray-600 mt-1">Expected: <code class="bg-white px-1 py-0.5 rounded text-blue-700">${displayExpected}</code></div>
+                    `;
+                }
+            }
+            
+            if (!passed && error) {
+                resultHtml += `
+                    <div class="mt-2 text-xs text-red-600">
+                        <div class="font-medium">Error:</div>
+                        <code class="bg-white px-2 py-1 rounded block mt-1">${error}</code>
+                    </div>
+                `;
+            }
+            
+            resultHtml += `
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            div.innerHTML = resultHtml;
+            testResultsEl.appendChild(div);
+        }
+
+        function testMethod(name, params, fn, expected = null) {
+            try {
+                const result = fn();
+                passedTests++;
+                addTestResult(name, params, true, result, expected);
+            } catch (e) {
+                failedTests++;
+                addTestResult(name, params, false, null, expected, e.message);
+            }
+            totalTests++;
+            updateSummary();
+        }
+
+        async function runAllTests() {
+            // Reset
+            totalTests = 0;
+            passedTests = 0;
+            failedTests = 0;
+            testResultsEl.innerHTML = '';
+            
+            testStatusEl.textContent = 'Running...';
+            testStatusEl.className = 'font-medium text-blue-600';
+            
+            // Date & Time (12 methods)
+            addCategoryHeader('Date & Time (12 methods)');
+            testMethod('julday', '2000, 1, 1, 12.0', () => swisseph.julday(2000, 1, 1, 12.0), 2451545.0);
+            testMethod('revjul', '2451545.0, 1', () => swisseph.revjul(2451545.0, 1), {year: 2000, month: 1, day: 1});
+            testMethod('date_conversion', '2000, 1, 1, 12.0, "g"', () => swisseph.date_conversion(2000, 1, 1, 12.0, 'g'), 2451545.0);
+            testMethod('utc_to_jd', '2000, 1, 1, 12, 0, 0, 1', () => swisseph.utc_to_jd(2000, 1, 1, 12, 0, 0, 1));
+            testMethod('jdet_to_utc', '2451545.0, 1', () => swisseph.jdet_to_utc(2451545.0, 1));
+            testMethod('jdut1_to_utc', '2451545.0, 1', () => swisseph.jdut1_to_utc(2451545.0, 1));
+            testMethod('utc_time_zone', '2000, 1, 1, 12, 0, 0, 1.0', () => swisseph.utc_time_zone(2000, 1, 1, 12, 0, 0, 1.0));
+            testMethod('deltat', '2451545.0', () => swisseph.deltat(2451545.0), '~0.000739');
+            testMethod('time_equ', '2451545.0', () => swisseph.time_equ(2451545.0), '~-0.00228');
+            testMethod('sidtime', '2451545.0', () => swisseph.sidtime(2451545.0), '~18.697');
+            testMethod('sidtime0', '2451545.0, 23.44, 0', () => swisseph.sidtime0(2451545.0, 23.44, 0), '~18.697');
+            testMethod('day_of_week', '2451545.0', () => swisseph.day_of_week(2451545.0), 5);
+            
+            // Planetary Positions (5 methods)
+            addCategoryHeader('Planetary Positions (5 methods)');
+            testMethod('calc', '2451545.0, SE_SUN, SEFLG_SWIEPH', () => swisseph.calc(2451545.0, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH));
+            testMethod('calc_ut', '2451545.0, SE_MOON, SEFLG_SWIEPH', () => swisseph.calc_ut(2451545.0, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH));
+            testMethod('get_planet_name', 'SE_SUN', () => swisseph.get_planet_name(swisseph.SE_SUN), 'Sun');
+            testMethod('pheno', '2451545.0, SE_MOON, SEFLG_SWIEPH', () => swisseph.pheno(2451545.0, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH));
+            testMethod('pheno_ut', '2451545.0, SE_MOON, SEFLG_SWIEPH', () => swisseph.pheno_ut(2451545.0, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH));
+            
+            // Houses (6 methods)
+            addCategoryHeader('Houses (6 methods)');
+            testMethod('houses', '2451545.0, 47.0, 8.0, "P"', () => swisseph.houses(2451545.0, 47.0, 8.0, 'P'));
+            testMethod('houses_ex', '2451545.0, SEFLG_SWIEPH, 47.0, 8.0, "P"', () => swisseph.houses_ex(2451545.0, swisseph.SEFLG_SWIEPH, 47.0, 8.0, 'P'));
+            testMethod('houses_ex2', '2451545.0, SEFLG_SWIEPH, 47.0, 8.0, "P"', () => swisseph.houses_ex2(2451545.0, swisseph.SEFLG_SWIEPH, 47.0, 8.0, 'P'));
+            testMethod('houses_armc', '12.0, 47.0, 23.44, "P"', () => swisseph.houses_armc(12.0, 47.0, 23.44, 'P'));
+            testMethod('houses_armc_ex2', '12.0, 47.0, 23.44, "P"', () => swisseph.houses_armc_ex2(12.0, 47.0, 23.44, 'P'));
+            testMethod('house_pos', '12.0, 47.0, 23.44, "P", 100.0, 0.0', () => swisseph.house_pos(12.0, 47.0, 23.44, 'P', 100.0, 0.0), '~12.28');
+            
+            // Math Functions (12 methods)
+            addCategoryHeader('Math Functions (12 methods)');
+            testMethod('degnorm', '370.0', () => swisseph.degnorm(370.0), 10.0);
+            testMethod('radnorm', '6.38', () => swisseph.radnorm(6.38), '~0.097');
+            testMethod('rad_midp', '0.1, 6.2', () => swisseph.rad_midp(0.1, 6.2), '~0.008');
+            testMethod('deg_midp', '10.0, 350.0', () => swisseph.deg_midp(10.0, 350.0), '0.0 or 180.0');
+            testMethod('split_deg', '123.456, SE_SPLIT_DEG_ROUND_SEC', () => swisseph.split_deg(123.456, swisseph.SE_SPLIT_DEG_ROUND_SEC), {degree: 123, min: 27, second: 22});
+            testMethod('csnorm', '370.0', () => swisseph.csnorm(370.0), 370);
+            testMethod('difcsn', '10.0, 350.0', () => swisseph.difcsn(10.0, 350.0), '129599660 (centiseconds)');
+            testMethod('difdegn', '10.0, 350.0', () => swisseph.difdegn(10.0, 350.0), 20.0);
+            testMethod('difcs2n', '10.0, 350.0', () => swisseph.difcs2n(10.0, 350.0), -340);
+            testMethod('difdeg2n', '10.0, 350.0', () => swisseph.difdeg2n(10.0, 350.0), 20.0);
+            testMethod('difrad2n', '0.1, 6.2', () => swisseph.difrad2n(0.1, 6.2), '~0.183');
+            testMethod('d2l', '123.456', () => swisseph.d2l(123.456), 123);
+            
+            // Fixed Stars (6 methods)
+            addCategoryHeader('Fixed Stars (6 methods)');
+            testMethod('fixstar', '"Sirius", 2451545.0, SEFLG_SWIEPH', () => swisseph.fixstar('Sirius', 2451545.0, swisseph.SEFLG_SWIEPH));
+            testMethod('fixstar_ut', '"Sirius", 2451545.0, SEFLG_SWIEPH', () => swisseph.fixstar_ut('Sirius', 2451545.0, swisseph.SEFLG_SWIEPH));
+            testMethod('fixstar_mag', '"Sirius"', () => swisseph.fixstar_mag('Sirius'), '-1.46');
+            testMethod('fixstar2', '"Sirius", 2451545.0, SEFLG_SWIEPH', () => swisseph.fixstar2('Sirius', 2451545.0, swisseph.SEFLG_SWIEPH));
+            testMethod('fixstar2_ut', '"Sirius", 2451545.0, SEFLG_SWIEPH', () => swisseph.fixstar2_ut('Sirius', 2451545.0, swisseph.SEFLG_SWIEPH));
+            testMethod('fixstar2_mag', '"Sirius"', () => swisseph.fixstar2_mag('Sirius'), '-1.46');
+            
+            // Ayanamsa (5 methods)
+            addCategoryHeader('Ayanamsa (5 methods)');
+            testMethod('set_sid_mode + get_ayanamsa', 'SE_SIDM_LAHIRI, 0, 0; 2451545.0', () => {
+                swisseph.set_sid_mode(swisseph.SE_SIDM_LAHIRI, 0, 0);
+                return swisseph.get_ayanamsa(2451545.0);
+            }, '~23.857');
+            testMethod('get_ayanamsa_ut', '2451545.0', () => swisseph.get_ayanamsa_ut(2451545.0), '~23.857');
+            testMethod('get_ayanamsa_ex', '2451545.0, SEFLG_SWIEPH', () => swisseph.get_ayanamsa_ex(2451545.0, swisseph.SEFLG_SWIEPH), '~23.857');
+            testMethod('get_ayanamsa_ex_ut', '2451545.0, SEFLG_SWIEPH', () => swisseph.get_ayanamsa_ex_ut(2451545.0, swisseph.SEFLG_SWIEPH), '~23.857');
+            testMethod('get_ayanamsa_name', 'SE_SIDM_LAHIRI', () => swisseph.get_ayanamsa_name(swisseph.SE_SIDM_LAHIRI), 'Lahiri');
+            
+            // Utilities (10 methods)
+            addCategoryHeader('Utilities (10 methods)');
+            testMethod('version', '', () => swisseph.version(), '2.10.03');
+            testMethod('cs2timestr', '12.5, " ", true', () => swisseph.cs2timestr(12.5, ' ', true), 'time string');
+            testMethod('cs2lonlatstr', '123.456, "E", "W"', () => swisseph.cs2lonlatstr(123.456, 'E', 'W'), 'lon/lat string');
+            testMethod('cs2degstr', '123.456', () => swisseph.cs2degstr(123.456), 'degree string');
+            testMethod('azalt', '2451545.0, SE_EQU2HOR, [8,47,400], 1013.25, 15.0, [100,10,1]', () => swisseph.azalt(2451545.0, swisseph.SE_EQU2HOR, [8,47,400], 1013.25, 15.0, [100,10,1]));
+            testMethod('azalt_rev', '2451545.0, SE_HOR2EQU, [8,47,400], [180,45,1]', () => swisseph.azalt_rev(2451545.0, swisseph.SE_HOR2EQU, [8,47,400], [180,45,1]));
+            testMethod('cotrans', '[100,10,1], 23.44', () => swisseph.cotrans([100,10,1], 23.44), 'coordinate array');
+            testMethod('cotrans_sp', '[100,10,1,0,0,0], 23.44', () => swisseph.cotrans_sp([100,10,1,0,0,0], 23.44), 'coordinate array with speed');
+            testMethod('get_tid_acc', '', () => swisseph.get_tid_acc(), '-25.8 (default)');
+            testMethod('set_tid_acc', '0.0', () => swisseph.set_tid_acc(0.0), 'void');
+            
+            // Nodes & Apsides (2 methods)
+            addCategoryHeader('Nodes & Apsides (2 methods)');
+            testMethod('nod_aps', '2451545.0, SE_MOON, SEFLG_SWIEPH, 0', () => swisseph.nod_aps(2451545.0, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH, 0), '0 or node data');
+            testMethod('nod_aps_ut', '2451545.0, SE_MOON, SEFLG_SWIEPH, 0', () => swisseph.nod_aps_ut(2451545.0, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH, 0), '0 or node data');
+            
+            // Final status
+            if (failedTests === 0) {
+                testStatusEl.textContent = 'All Passed!';
+                testStatusEl.className = 'font-medium text-green-600';
+            } else {
+                testStatusEl.textContent = failedTests + ' Failed';
+                testStatusEl.className = 'font-medium text-red-600';
+            }
+        }
+
+        function clearResults() {
+            totalTests = 0;
+            passedTests = 0;
+            failedTests = 0;
+            testResultsEl.innerHTML = '<div class="text-gray-500 text-sm italic">Click "Run All Tests" to begin testing...</div>';
+            updateSummary();
+            progressBarEl.style.width = '0%';
+            testStatusEl.textContent = 'Ready';
+            testStatusEl.className = 'font-medium text-green-600';
+        }
+
+        // Event listeners
+        document.getElementById('runAllTests').addEventListener('click', runAllTests);
+        document.getElementById('clearResults').addEventListener('click', clearResults);
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

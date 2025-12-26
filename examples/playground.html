@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swiss Ephemeris Playground</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">
+                            Swiss Ephemeris Playground
+                        </h1>
+                        <p class="text-gray-600 mt-1">Write and execute custom astronomical programs</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="flex gap-3 mb-2">
+                            <a href="api-explorer.html" class="text-sm text-blue-600 hover:text-blue-800">API Explorer</a>
+                            <a href="tests.html" class="text-sm text-blue-600 hover:text-blue-800">Tests</a>
+                        </div>
+                        <div class="text-sm" :class="status.color">{{ status.text }}</div>
+                        <div class="text-xs text-gray-400 mt-1">{{ version }}</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="container mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Left: Code Editor -->
+                <div class="space-y-4">
+                    <div class="bg-white rounded border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-lg font-semibold text-gray-900">Code Editor</h2>
+                            <button @click="runCode" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-all font-medium text-sm">
+                                Run Code
+                            </button>
+                        </div>
+                        
+                        <textarea v-model="code" 
+                                  class="w-full h-[500px] bg-gray-50 border border-gray-300 rounded p-3 font-mono text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-none"
+                                  placeholder="Write your code here..."></textarea>
+                        
+                        <div class="mt-2 text-xs text-gray-500">
+                            Tip: Use <code class="bg-gray-100 px-2 py-0.5 rounded">swisseph</code> to access all methods
+                        </div>
+                    </div>
+
+                    <!-- Quick Reference -->
+                    <div class="bg-white rounded border border-gray-200 p-3">
+                        <h3 class="text-sm font-semibold text-gray-900 mb-2">Quick Reference</h3>
+                        <div class="space-y-1 text-xs">
+                            <div><code class="text-blue-600">swisseph.julday(2000, 1, 1, 12.0)</code> - Convert date to JD</div>
+                            <div><code class="text-blue-600">swisseph.calc(jd, swisseph.SE_SUN, ...)</code> - Planet position</div>
+                            <div><code class="text-blue-600">swisseph.houses(jd, lat, lon, 'P')</code> - House cusps</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Templates + Output + Saved -->
+                <div class="space-y-4">
+                    <!-- Program Templates - Compact Batch -->
+                    <div class="bg-white rounded border border-gray-200 p-3">
+                        <h2 class="text-sm font-semibold text-gray-900 mb-2">Program Templates</h2>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button v-for="template in templates" :key="template.name"
+                                    @click="loadTemplate(template)"
+                                    class="p-2 bg-gray-50 rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-center">
+                                <div class="font-medium text-gray-900 text-xs">{{ template.name }}</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Output -->
+                    <div class="bg-white rounded border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-lg font-semibold text-gray-900">Output</h2>
+                            <button @click="clearOutput" 
+                                    class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-all text-sm">
+                                Clear
+                            </button>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded border border-gray-200 p-3 h-80 overflow-y-auto font-mono text-sm">
+                            <div v-if="output.length === 0" class="text-gray-400 italic">
+                                No output yet. Run some code to see results.
+                            </div>
+                            <div v-for="(item, idx) in output" :key="idx" class="mb-2">
+                                <div v-if="item.type === 'log'" class="text-blue-600">
+                                    <span class="text-gray-400">›</span> {{ item.value }}
+                                </div>
+                                <div v-else-if="item.type === 'result'" class="text-green-600">
+                                    <span class="text-gray-400">→</span> {{ item.value }}
+                                </div>
+                                <div v-else-if="item.type === 'error'" class="text-red-600">
+                                    <span class="text-gray-400">✗</span> {{ item.value }}
+                                </div>
+                                <div v-else-if="item.type === 'object'" class="text-gray-700">
+                                    <pre class="whitespace-pre-wrap">{{ item.value }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Saved Programs -->
+                    <div class="bg-white rounded border border-gray-200 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h2 class="text-sm font-semibold text-gray-900">Saved Programs</h2>
+                            <button @click="saveProgram" 
+                                    class="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all text-xs">
+                                + Save
+                            </button>
+                        </div>
+                        
+                        <div v-if="savedPrograms.length === 0" class="text-gray-400 text-xs italic">
+                            No saved programs yet
+                        </div>
+                        <div v-else class="space-y-2 max-h-40 overflow-y-auto">
+                            <div v-for="(program, idx) in savedPrograms" :key="idx"
+                                 class="bg-gray-50 rounded border border-gray-200 p-2 hover:bg-gray-100 transition-all">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-gray-900 text-xs truncate">{{ program.name }}</div>
+                                        <div class="text-xs text-gray-500">{{ program.date }}</div>
+                                    </div>
+                                    <div class="flex gap-1 ml-2">
+                                        <button @click="loadSavedProgram(program)" 
+                                                class="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs">
+                                            Load
+                                        </button>
+                                        <button @click="deleteSavedProgram(idx)" 
+                                                class="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs">
+                                            Del
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import SwissEph from '../src/swisseph.js';
+
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    swisseph: null,
+                    status: { text: 'Loading...', color: 'text-yellow-600' },
+                    version: '',
+                    code: '',
+                    output: [],
+                    savedPrograms: [],
+                    templates: [
+                        {
+                            name: 'Birth Chart',
+                            description: 'Calculate natal chart positions',
+                            code: `// Birth Chart Calculator
+const birthDate = { year: 1990, month: 6, day: 15, hour: 14.5 };
+const birthPlace = { lat: 40.7128, lon: -74.0060 }; // New York
+
+// Convert to Julian Day
+const jd = swisseph.julday(birthDate.year, birthDate.month, birthDate.day, birthDate.hour);
+console.log('Julian Day:', jd);
+
+// Calculate Sun position
+const sun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH);
+console.log('Sun:', sun.longitude.toFixed(2) + '°');
+
+// Calculate Moon position
+const moon = swisseph.calc(jd, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH);
+console.log('Moon:', moon.longitude.toFixed(2) + '°');
+
+// Calculate Ascendant
+const houses = swisseph.houses(jd, birthPlace.lat, birthPlace.lon, 'P');
+console.log('Ascendant:', houses.ascmc[0].toFixed(2) + '°');
+
+return {
+    sun: sun.longitude,
+    moon: moon.longitude,
+    ascendant: houses.ascmc[0]
+};`
+                        },
+                        {
+                            name: 'Planet Positions',
+                            description: 'Get all planet positions',
+                            code: `// All Planet Positions
+const jd = swisseph.julday(2024, 1, 1, 12.0);
+
+const planets = [
+    { id: swisseph.SE_SUN, name: 'Sun' },
+    { id: swisseph.SE_MOON, name: 'Moon' },
+    { id: swisseph.SE_MERCURY, name: 'Mercury' },
+    { id: swisseph.SE_VENUS, name: 'Venus' },
+    { id: swisseph.SE_MARS, name: 'Mars' },
+    { id: swisseph.SE_JUPITER, name: 'Jupiter' },
+    { id: swisseph.SE_SATURN, name: 'Saturn' }
+];
+
+const positions = {};
+
+planets.forEach(planet => {
+    const pos = swisseph.calc(jd, planet.id, swisseph.SEFLG_SWIEPH);
+    positions[planet.name] = pos.longitude.toFixed(2) + '°';
+    console.log(planet.name + ':', positions[planet.name]);
+});
+
+return positions;`
+                        },
+                        {
+                            name: 'House System',
+                            description: 'Calculate house cusps',
+                            code: `// House System Calculator
+const jd = swisseph.julday(2024, 1, 1, 12.0);
+const lat = 51.5074; // London
+const lon = -0.1278;
+
+// Calculate houses (Placidus)
+const houses = swisseph.houses(jd, lat, lon, 'P');
+
+console.log('House Cusps (Placidus):');
+for (let i = 1; i <= 12; i++) {
+    console.log('House ' + i + ':', houses.cusps[i].toFixed(2) + '°');
+}
+
+console.log('\\nAngles:');
+console.log('Ascendant:', houses.ascmc[0].toFixed(2) + '°');
+console.log('MC:', houses.ascmc[1].toFixed(2) + '°');
+
+return {
+    cusps: houses.cusps.slice(1, 13),
+    ascendant: houses.ascmc[0],
+    mc: houses.ascmc[1]
+};`
+                        },
+                        {
+                            name: 'Sidereal Time',
+                            description: 'Calculate sidereal time',
+                            code: `// Sidereal Time Calculator
+const now = new Date();
+const jd = swisseph.julday(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    now.getDate(),
+    now.getHours() + now.getMinutes() / 60
+);
+
+const sidtime = swisseph.sidtime(jd);
+const hours = Math.floor(sidtime);
+const minutes = Math.floor((sidtime - hours) * 60);
+const seconds = Math.floor(((sidtime - hours) * 60 - minutes) * 60);
+
+console.log('Current Date:', now.toLocaleDateString());
+console.log('Julian Day:', jd.toFixed(4));
+console.log('Sidereal Time:', hours + 'h ' + minutes + 'm ' + seconds + 's');
+
+return {
+    julianDay: jd,
+    siderealTime: sidtime,
+    formatted: hours + ':' + minutes + ':' + seconds
+};`
+                        },
+                        {
+                            name: 'Ayanamsa',
+                            description: 'Calculate ayanamsa values',
+                            code: `// Ayanamsa Calculator
+const jd = swisseph.julday(2024, 1, 1, 0.0);
+
+// Set Lahiri ayanamsa
+swisseph.set_sid_mode(swisseph.SE_SIDM_LAHIRI, 0, 0);
+
+const ayanamsa = swisseph.get_ayanamsa(jd);
+const name = swisseph.get_ayanamsa_name(swisseph.SE_SIDM_LAHIRI);
+
+console.log('Ayanamsa System:', name);
+console.log('Ayanamsa Value:', ayanamsa.toFixed(6) + '°');
+
+// Calculate tropical vs sidereal Sun
+const tropicalSun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH);
+const siderealSun = tropicalSun.longitude - ayanamsa;
+
+console.log('\\nSun Position:');
+console.log('Tropical:', tropicalSun.longitude.toFixed(2) + '°');
+console.log('Sidereal:', siderealSun.toFixed(2) + '°');
+
+return {
+    ayanamsa: ayanamsa,
+    tropical: tropicalSun.longitude,
+    sidereal: siderealSun
+};`
+                        },
+                        {
+                            name: 'Date Conversion',
+                            description: 'Convert between date formats',
+                            code: `// Date Conversion Examples
+const date = { year: 2024, month: 6, day: 21, hour: 12.0 };
+
+// Convert to Julian Day
+const jd = swisseph.julday(date.year, date.month, date.day, date.hour);
+console.log('Julian Day:', jd);
+
+// Convert back to calendar
+const revDate = swisseph.revjul(jd, 1);
+console.log('Reverse:', revDate.year + '-' + revDate.month + '-' + revDate.day + ' ' + revDate.hour + 'h');
+
+// Calculate day of week
+const dow = swisseph.day_of_week(jd);
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+console.log('Day of Week:', days[dow]);
+
+// Delta T
+const deltaT = swisseph.deltat(jd);
+console.log('Delta T:', (deltaT * 86400).toFixed(2) + ' seconds');
+
+return {
+    julianDay: jd,
+    dayOfWeek: days[dow],
+    deltaT: deltaT
+};`
+                        }
+                    ]
+                };
+            },
+            async mounted() {
+                await this.init();
+                this.loadSavedPrograms();
+            },
+            methods: {
+                async init() {
+                    try {
+                        this.status = { text: 'Initializing...', color: 'text-yellow-600' };
+                        this.swisseph = new SwissEph();
+                        await this.swisseph.initSwissEph();
+                        
+                        this.version = 'Swiss Ephemeris v' + this.swisseph.version();
+                        this.status = { text: 'Ready', color: 'text-green-600' };
+                        
+                        // Load first template by default
+                        this.loadTemplate(this.templates[0]);
+                    } catch (error) {
+                        this.status = { text: 'Error: ' + error.message, color: 'text-red-600' };
+                    }
+                },
+                loadTemplate(template) {
+                    this.code = template.code;
+                    this.output = [];
+                },
+                runCode() {
+                    this.output = [];
+                    
+                    // Create a custom console
+                    const customConsole = {
+                        log: (...args) => {
+                            args.forEach(arg => {
+                                if (typeof arg === 'object') {
+                                    this.output.push({ 
+                                        type: 'object', 
+                                        value: JSON.stringify(arg, null, 2) 
+                                    });
+                                } else {
+                                    this.output.push({ type: 'log', value: String(arg) });
+                                }
+                            });
+                        }
+                    };
+                    
+                    try {
+                        // Create function with swisseph and console in scope
+                        const func = new Function('swisseph', 'console', this.code);
+                        const result = func(this.swisseph, customConsole);
+                        
+                        if (result !== undefined) {
+                            if (typeof result === 'object') {
+                                this.output.push({ 
+                                    type: 'object', 
+                                    value: JSON.stringify(result, null, 2) 
+                                });
+                            } else {
+                                this.output.push({ type: 'result', value: String(result) });
+                            }
+                        }
+                    } catch (error) {
+                        this.output.push({ type: 'error', value: error.message });
+                    }
+                },
+                clearOutput() {
+                    this.output = [];
+                },
+                saveProgram() {
+                    const name = prompt('Enter a name for this program:');
+                    if (!name) return;
+                    
+                    const program = {
+                        name: name,
+                        code: this.code,
+                        date: new Date().toLocaleString()
+                    };
+                    
+                    this.savedPrograms.push(program);
+                    localStorage.setItem('swisseph_programs', JSON.stringify(this.savedPrograms));
+                },
+                loadSavedProgram(program) {
+                    this.code = program.code;
+                    this.output = [];
+                },
+                deleteSavedProgram(idx) {
+                    if (confirm('Delete this program?')) {
+                        this.savedPrograms.splice(idx, 1);
+                        localStorage.setItem('swisseph_programs', JSON.stringify(this.savedPrograms));
+                    }
+                },
+                loadSavedPrograms() {
+                    const saved = localStorage.getItem('swisseph_programs');
+                    if (saved) {
+                        this.savedPrograms = JSON.parse(saved);
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
