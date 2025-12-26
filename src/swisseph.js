@@ -338,6 +338,14 @@ class SwissEph {
       } catch (e) {
         console.warn('Failed to configure path resolution for SwissEph WASM:', e);
       }
+    } else {
+      // Browser environment
+      moduleConfig.locateFile = (path, prefix) => {
+        if (path.endsWith('.data') || path.endsWith('.wasm')) {
+          return new URL('../wsam/' + path, import.meta.url).href;
+        }
+        return prefix + path;
+      };
     }
 
     this.SweModule = await WasamSwissEph(moduleConfig);
