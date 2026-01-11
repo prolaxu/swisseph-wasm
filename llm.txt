@@ -1,0 +1,238 @@
+# swisseph-wasm: LLM API Documentation
+
+This file helps Large Language Models (LLMs) understand the `swisseph-wasm` package.
+It provides a high-precision WebAssembly wrapper for the Swiss Ephemeris (C library) in JavaScript.
+
+## 1. Core Concepts & Initialization
+
+*   **Async Init**: You MUST await `initSwissEph()` before using the library.
+*   **Memory cleanup**: You MUST call `close()` to prevent memory leaks.
+*   **Coordinate System**: Defaults to Tropical Zodiac, degrees.
+*   **Time**: All calculations operate on Julian Days (UT or ET).
+*   **Ephemeris Files**: The WASM module handles these internally. Defaults to Moshier (analytic) if files are missing, but `SEFLG_MOSEPH` explicitly forces it.
+
+### Basic Pattern
+```typescript
+import SwissEph from 'swisseph-wasm';
+
+const swe = new SwissEph();
+await swe.initSwissEph(); 
+
+// ... operations ...
+
+swe.close();
+```
+
+## 2. API Reference (TypeScript Definitions)
+
+### Date & Time Conversions
+```typescript
+/** Calculate Julian Day from UTC date */
+julday(year: number, month: number, day: number, hour: number, gregflag?: number): number;
+
+/** Detailed UTC to Julian Day conversion */
+utc_to_jd(year: number, month: number, day: number, hour: number, minute: number, second: number, gregflag: number): { julianDayET: number, julianDayUT: number };
+
+/** Reverse Julian Day to UTC date */
+revjul(julianDay: number, gregflag: number): { year: number, month: number, day: number, hour: number };
+
+/** Calculate Delta T (difference between ET and UT) */
+deltat(julianDay: number): number;
+
+/** Calculate Sidereal Time */
+sidtime(julianDay: number): number;
+```
+
+### Planetary Calculations
+```typescript
+/** 
+ * Calculate body position (Universal Time)
+ * Returns array: [longitude, latitude, distance, speedLon, speedLat, speedDist]
+ */
+calc_ut(julianDay: number, body: number, flags: number): number[];
+
+/** 
+ * Calculate body position (Universal Time) - Object Return
+ */
+calc(julianDay: number, body: number, flags: number): {
+  longitude: number;
+  latitude: number;
+  distance: number;
+  longitudeSpeed: number;
+  latitudeSpeed: number;
+  distanceSpeed: number;
+};
+
+/** Get Planet Name */
+get_planet_name(body: number): string;
+```
+
+### Houses & Angles
+```typescript
+/** Calculate House Cusps and Ascendant */
+houses(julianDay: number, lat: number, lon: number, hsys: string): {
+  cusp: number[];       // Array of 13 numbers (index 1-12 used)
+  asc: number;          // Ascendant
+  mc: number;           // Midheaven
+  armc: number;         // ARMC
+  vertex: number;       // Vertex
+};
+
+/** Calculate House Position of a body */
+house_pos(armc: number, geolat: number, eps: number, hsys: string, lon: number, lat: number): number;
+```
+
+### Sidereal Mode (Vedic/Jyotish)
+```typescript
+/** Set the Sidereal Ayanamsa Mode */
+set_sid_mode(mode: number, t0: number, ayan_t0: number): void;
+
+/** Get the current Ayanamsa value */
+get_ayanamsa(julianDay: number): number;
+```
+
+### Eclipses & Phenomena
+```typescript
+/** Calculate Planetary Phenomena (Phase, Phase Angle, Elongation, etc.) */
+pheno_ut(julianDay: number, body: number, flags: number): {
+  phaseAngle: number;
+  phase: number;
+  elongation: number;
+  apparentDiameter: number;
+  apparentMagnitude: number;
+};
+```
+
+### Math Utilities
+```typescript
+/** Normalize degrees to 0-360 */
+degnorm(deg: number): number;
+
+/** Convert degrees to DMS string (e.g. "12°30'45") */
+split_deg(deg: number, roundFlag: number): { degree: number, min: number, second: number, fraction: number, sign: number };
+```
+
+## 3. Constants Reference
+
+### Planets (Bodies)
+```javascript
+swe.SE_SUN = 0;
+swe.SE_MOON = 1;
+swe.SE_MERCURY = 2;
+swe.SE_VENUS = 3;
+swe.SE_MARS = 4;
+swe.SE_JUPITER = 5;
+swe.SE_SATURN = 6;
+swe.SE_URANUS = 7;
+swe.SE_NEPTUNE = 8;
+swe.SE_PLUTO = 9;
+swe.SE_MEAN_NODE = 10;  // Mean North Node (Rahu)
+swe.SE_TRUE_NODE = 11;  // True North Node
+swe.SE_MEAN_APOG = 12;  // Mean Lilith (Black Moon)
+swe.SE_OSCU_APOG = 13;  // Osculating Lilith
+swe.SE_CHIRON = 15;
+swe.SE_PHOLUS = 16;
+swe.SE_CERES = 17;
+swe.SE_PALLAS = 18;
+swe.SE_JUNO = 19;
+swe.SE_VESTA = 20;
+```
+
+### Calculation Flags (Bitwise Combinable)
+```javascript
+swe.SEFLG_SWIEPH = 2;       // Use Swiss Ephemeris data (Precision: 0.001")
+swe.SEFLG_JPLEPH = 1;       // Use JPL DE431 data
+swe.SEFLG_MOSEPH = 4;       // Use Moshier analytic (Precision: ~0.1-1.0") - NO FILES NEEDED
+swe.SEFLG_HELCTR = 8;       // Heliocentric
+swe.SEFLG_TRUEPOS = 16;     // True geometric position
+swe.SEFLG_J2000 = 32;       // J2000 Equinox
+swe.SEFLG_NONUT = 64;       // No Nutation
+swe.SEFLG_SPEED = 256;      // Calculate speeds
+swe.SEFLG_NOGDEFL = 512;    // No gravitational deflection
+swe.SEFLG_NOABERR = 1024;   // No aberration
+swe.SEFLG_EQUATORIAL = 2048;// Equatorial (RA/Dec)
+swe.SEFLG_XYZ = 4096;       // Cartesian (X,Y,Z)
+swe.SEFLG_RADIANS = 8192;   // Return radians
+swe.SEFLG_BARYCTR = 16384;  // Barycentric
+swe.SEFLG_TOPOCTR = 32768;  // Topocentric
+swe.SEFLG_SIDEREAL = 65536; // Sidereal Zodiac
+```
+
+### Sidereal Modes (Ayanamsas)
+```javascript
+swe.SE_SIDM_FAGAN_BRADLEY = 0;
+swe.SE_SIDM_LAHIRI = 1;       // Official Indian
+swe.SE_SIDM_DELUCE = 2;
+swe.SE_SIDM_RAMAN = 3;
+swe.SE_SIDM_USHASHASHI = 4;
+swe.SE_SIDM_KRISHNAMURTI = 5; // KP Astrology
+swe.SE_SIDM_DJWHAL_KHUL = 6;
+swe.SE_SIDM_YUKTESHWAR = 7;
+swe.SE_SIDM_JN_BHASIN = 8;
+swe.SE_SIDM_BABYL_KUGLER1 = 9;
+```
+
+### House Systems
+```javascript
+'P' // Placidus
+'K' // Koch
+'O' // Porphyrius
+'R' // Regiomontanus
+'C' // Campanus
+'E' // Equal (Cusp 1 = Asc)
+'A' // Equal (Cusp 1 = Aries)
+'W' // Whole Sign
+'X' // Vedic Equal (Cusp 1 = Asc +- 15deg)
+'B' // Alcabitius
+'M' // Morinus
+```
+
+### Calendars
+```javascript
+swe.SE_JUL_CAL = 0;
+swe.SE_GREG_CAL = 1;
+```
+
+## 4. Usage Examples
+
+### Example: Full Natal Chart (Tropical)
+```javascript
+const swe = new SwissEph();
+await swe.initSwissEph();
+
+// 1. Convert Date to Julian Day (UT)
+// Date: 2000-01-01 12:00:00 UTC
+const jd = swe.julday(2000, 1, 1, 12, swe.SE_GREG_CAL);
+
+// 2. Calculate Planets
+const bodies = [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS];
+const flags = swe.SEFLG_SWIEPH | swe.SEFLG_SPEED; 
+
+bodies.forEach(body => {
+  const pos = swe.calc_ut(jd, body, flags);
+  console.log(`${swe.get_planet_name(body)}: ${pos[0].toFixed(4)}°`);
+});
+
+// 3. Calculate Houses (Placidus) at Lat: 47.0N, Lon: 8.0E
+const houses = swe.houses(jd, 47.0, 8.0, 'P');
+console.log('Ascendant:', houses.asc);
+console.log('MC:', houses.mc);
+console.log('House 1:', houses.cusp[1]);
+
+swe.close();
+```
+
+### Example: Vedic (Sidereal) Chart
+```javascript
+// Set Ayanamsa to Lahiri
+swe.set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+
+// Use Sidereal Flag
+const flags = swe.SEFLG_SWIEPH | swe.SEFLG_SIDEREAL;
+
+const sun = swe.calc_ut(jd, swe.SE_SUN, flags);
+console.log('Sidereal Sun:', sun[0]); // Returns positions in Sidereal zodiac
+
+const ayanamsa = swe.get_ayanamsa(jd);
+console.log('Current Ayanamsa:', ayanamsa);
+```
