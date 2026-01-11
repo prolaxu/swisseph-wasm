@@ -357,7 +357,7 @@
                         description: 'Normalize radians to 0-2π',
                         params: [{ name: 'rad', type: 'number', default: 6.38 }],
                         example: 'swisseph.radnorm(6.38)',
-                        expectedResult: '~0.098'
+                        expectedResult: '~0.097'
                     },
                     {
                         name: 'rad_midp',
@@ -367,7 +367,7 @@
                             { name: 'rad2', type: 'number', default: 6.2 }
                         ],
                         example: 'swisseph.rad_midp(0.1, 6.2)',
-                        expectedResult: '~3.15'
+                        expectedResult: '~0.0084'
                     },
                     {
                         name: 'deg_midp',
@@ -394,7 +394,7 @@
                         description: 'Normalize centiseconds',
                         params: [{ name: 'cs', type: 'number', default: 370.0 }],
                         example: 'swisseph.csnorm(370.0)',
-                        expectedResult: '10'
+                        expectedResult: '370'
                     },
                     {
                         name: 'difcsn',
@@ -404,7 +404,7 @@
                             { name: 'cs2', type: 'number', default: 350.0 }
                         ],
                         example: 'swisseph.difcsn(10.0, 350.0)',
-                        expectedResult: '20'
+                        expectedResult: '129599660'
                     },
                     {
                         name: 'difdegn',
@@ -424,7 +424,7 @@
                             { name: 'cs2', type: 'number', default: 350.0 }
                         ],
                         example: 'swisseph.difcs2n(10.0, 350.0)',
-                        expectedResult: '20'
+                        expectedResult: '-340'
                     },
                     {
                         name: 'difdeg2n',
@@ -444,14 +444,14 @@
                             { name: 'rad2', type: 'number', default: 6.2 }
                         ],
                         example: 'swisseph.difrad2n(0.1, 6.2)',
-                        expectedResult: '~0.383'
+                        expectedResult: '~0.183'
                     },
                     {
                         name: 'd2l',
                         description: 'Degrees to long',
                         params: [{ name: 'deg', type: 'number', default: 123.456 }],
                         example: 'swisseph.d2l(123.456)',
-                        expectedResult: '4444416'
+                        expectedResult: '123'
                     }
                 ]
             },
@@ -577,30 +577,30 @@
                         name: 'cs2timestr',
                         description: 'Centiseconds to time string',
                         params: [
-                            { name: 'cs', type: 'number', default: 12.5 },
+                            { name: 'cs', type: 'number', default: 4500000 },
                             { name: 'sep', type: 'text', default: ' ' },
                             { name: 'suppressZero', type: 'select', default: 'true', options: ['true', 'false'] }
                         ],
-                        example: 'swisseph.cs2timestr(12.5, " ", true)',
+                        example: 'swisseph.cs2timestr(4500000, " ", true)',
                         expectedResult: '"12 30"'
                     },
                     {
                         name: 'cs2lonlatstr',
                         description: 'Centiseconds to lon/lat string',
                         params: [
-                            { name: 'cs', type: 'number', default: 123.456 },
+                            { name: 'cs', type: 'number', default: 44444160 },
                             { name: 'pchar', type: 'text', default: 'E' },
                             { name: 'mchar', type: 'text', default: 'W' }
                         ],
-                        example: 'swisseph.cs2lonlatstr(123.456, "E", "W")',
-                        expectedResult: '"123°27\'22\\" E"'
+                        example: 'swisseph.cs2lonlatstr(44444160, "E", "W")',
+                        expectedResult: '"123E27\'22"'
                     },
                     {
                         name: 'cs2degstr',
-                        description: 'Centiseconds to degree string',
-                        params: [{ name: 'cs', type: 'number', default: 123.456 }],
-                        example: 'swisseph.cs2degstr(123.456)',
-                        expectedResult: '"123°27\'22\\""'
+                        description: 'Centiseconds to degree string (mod 30)',
+                        params: [{ name: 'cs', type: 'number', default: 44444160 }],
+                        example: 'swisseph.cs2degstr(44444160)',
+                        expectedResult: '" 3°27\'21"'
                     },
                     {
                         name: 'azalt',
@@ -653,7 +653,7 @@
                         description: 'Get tidal acceleration',
                         params: [],
                         example: 'swisseph.get_tid_acc()',
-                        expectedResult: '0.0'
+                        expectedResult: '-25.8'
                     },
                     {
                         name: 'set_tid_acc',
@@ -802,6 +802,9 @@
                         value = parseFloat(value);
                     } else if (param.type === 'select' && value.startsWith('SE')) {
                         value = swisseph[value];
+                    } else if (param.type === 'text' && value.includes(',')) {
+                         // Parse "1,2,3" into [1, 2, 3]
+                         value = value.split(',').map(v => parseFloat(v.trim()));
                     }
                     
                     return value;

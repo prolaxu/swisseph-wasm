@@ -478,11 +478,35 @@ class SwissEph {
   }
 
   cotrans(xpo, eps) {
-    return this.SweModule.ccall('swe_cotrans', 'void', ['array', 'number'], [xpo, eps]);
+    const xpoPtr = this.SweModule._malloc(3 * 8); // 3 doubles
+    const xpnPtr = this.SweModule._malloc(3 * 8); // 3 doubles
+    
+    this.SweModule.HEAPF64.set(xpo, xpoPtr >> 3);
+    
+    this.SweModule.ccall('swe_cotrans', 'void', ['number', 'number', 'number'], [xpoPtr, xpnPtr, eps]);
+    
+    const result = new Float64Array(this.SweModule.HEAPF64.buffer, xpnPtr, 3).slice();
+    
+    this.SweModule._free(xpoPtr);
+    this.SweModule._free(xpnPtr);
+    
+    return Array.from(result);
   }
 
   cotrans_sp(xpo, eps) {
-    return this.SweModule.ccall('swe_cotrans_sp', 'void', ['array', 'number'], [xpo, eps]);
+    const xpoPtr = this.SweModule._malloc(6 * 8); // 6 doubles
+    const xpnPtr = this.SweModule._malloc(6 * 8); // 6 doubles
+    
+    this.SweModule.HEAPF64.set(xpo, xpoPtr >> 3);
+    
+    this.SweModule.ccall('swe_cotrans_sp', 'void', ['number', 'number', 'number'], [xpoPtr, xpnPtr, eps]);
+    
+    const result = new Float64Array(this.SweModule.HEAPF64.buffer, xpnPtr, 6).slice();
+    
+    this.SweModule._free(xpoPtr);
+    this.SweModule._free(xpnPtr);
+    
+    return Array.from(result);
   }
 
   get_tid_acc() {
@@ -580,15 +604,27 @@ class SwissEph {
   }
 
   cs2timestr(t, sep, suppressZero) {
-    return this.SweModule.ccall('swe_cs2timestr', 'string', ['number', 'number', 'number'], [t, sep, suppressZero]);
+    const bufPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall('swe_cs2timestr', 'void', ['number', 'number', 'number', 'pointer'], [t, sep.charCodeAt(0), suppressZero ? 1 : 0, bufPtr]);
+    const result = this.SweModule.UTF8ToString(bufPtr);
+    this.SweModule._free(bufPtr);
+    return result;
   }
 
   cs2lonlatstr(t, pChar, mChar) {
-    return this.SweModule.ccall('swe_cs2lonlatstr', 'string', ['number', 'string', 'string'], [t, pChar, mChar]);
+    const bufPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall('swe_cs2lonlatstr', 'void', ['number', 'number', 'number', 'pointer'], [t, pChar.charCodeAt(0), mChar.charCodeAt(0), bufPtr]);
+    const result = this.SweModule.UTF8ToString(bufPtr);
+    this.SweModule._free(bufPtr);
+    return result;
   }
 
   cs2degstr(t) {
-    return this.SweModule.ccall('swe_cs2degstr', 'string', ['number'], [t]);
+    const bufPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall('swe_cs2degstr', 'void', ['number', 'pointer'], [t, bufPtr]);
+    const result = this.SweModule.UTF8ToString(bufPtr);
+    this.SweModule._free(bufPtr);
+    return result;
   }
 
 
@@ -915,27 +951,31 @@ class SwissEph {
 
   get_ayanamsa_ex(julianDay, ephemerisFlag) {
     const resultPtr = this.SweModule._malloc(8);
+    const errorPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_get_ayanamsa_ex',
       'number',
-      ['number', 'number', 'pointer'],
-      [julianDay, ephemerisFlag, resultPtr]
+      ['number', 'number', 'pointer', 'pointer'],
+      [julianDay, ephemerisFlag, resultPtr, errorPtr]
     );
     const result = this.SweModule.HEAPF64[resultPtr / 8];
     this.SweModule._free(resultPtr);
+    this.SweModule._free(errorPtr);
     return retFlag < 0 ? null : result;
   }
 
   get_ayanamsa_ex_ut(julianDay, ephemerisFlag) {
     const resultPtr = this.SweModule._malloc(8);
+    const errorPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_get_ayanamsa_ex_ut',
       'number',
-      ['number', 'number', 'pointer'],
-      [julianDay, ephemerisFlag, resultPtr]
+      ['number', 'number', 'pointer', 'pointer'],
+      [julianDay, ephemerisFlag, resultPtr, errorPtr]
     );
     const result = this.SweModule.HEAPF64[resultPtr / 8];
     this.SweModule._free(resultPtr);
+    this.SweModule._free(errorPtr);
     return retFlag < 0 ? null : result;
   }
 
@@ -949,21 +989,75 @@ class SwissEph {
   }
 
   nod_aps(julianDay, planet, flags, method) {
-    return this.SweModule.ccall(
+    const xnPtr = this.SweModule._malloc(4 * 8);
+    const xasPtr = this.SweModule._malloc(4 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    
+    const retFlag = this.SweModule.ccall(
       'swe_nod_aps',
       'number',
-      ['number', 'number', 'number', 'number'],
-      [julianDay, planet, flags, method]
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [julianDay, planet, flags, method, xnPtr, xasPtr, serrPtr]
     );
+
+    if (retFlag < 0) {
+       this.SweModule._free(xnPtr);
+       this.SweModule._free(xasPtr);
+       this.SweModule._free(serrPtr);
+       return { error: retFlag };
+    }
+
+    const nodes = new Float64Array(this.SweModule.HEAPF64.buffer, xnPtr, 4).slice();
+    const apsides = new Float64Array(this.SweModule.HEAPF64.buffer, xasPtr, 4).slice();
+    
+    this.SweModule._free(xnPtr);
+    this.SweModule._free(xasPtr);
+    this.SweModule._free(serrPtr);
+    
+    return {
+       nodes: Array.from(nodes),
+       apsides: Array.from(apsides),
+       asc_node: nodes[0],
+       desc_node: nodes[1],
+       perihelion: apsides[0],
+       aphelion: apsides[1]
+    };
   }
 
   nod_aps_ut(julianDay, planet, flags, method) {
-    return this.SweModule.ccall(
+    const xnPtr = this.SweModule._malloc(4 * 8);
+    const xasPtr = this.SweModule._malloc(4 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    
+    const retFlag = this.SweModule.ccall(
       'swe_nod_aps_ut',
       'number',
-      ['number', 'number', 'number', 'number'],
-      [julianDay, planet, flags, method]
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [julianDay, planet, flags, method, xnPtr, xasPtr, serrPtr]
     );
+
+    if (retFlag < 0) {
+       this.SweModule._free(xnPtr);
+       this.SweModule._free(xasPtr);
+       this.SweModule._free(serrPtr);
+       return { error: retFlag };
+    }
+
+    const nodes = new Float64Array(this.SweModule.HEAPF64.buffer, xnPtr, 4).slice();
+    const apsides = new Float64Array(this.SweModule.HEAPF64.buffer, xasPtr, 4).slice();
+    
+    this.SweModule._free(xnPtr);
+    this.SweModule._free(xasPtr);
+    this.SweModule._free(serrPtr);
+    
+    return {
+       nodes: Array.from(nodes),
+       apsides: Array.from(apsides),
+       asc_node: nodes[0],
+       desc_node: nodes[1],
+       perihelion: apsides[0],
+       aphelion: apsides[1]
+    };
   }
 
   get_orbital_elements(julianDay, planet, flags) {
