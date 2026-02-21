@@ -37,7 +37,7 @@
  * licenses for Swiss Ephemeris.
  */
 
-import WasamSwissEph from '../wsam/swisseph.js';
+import WasmSwissEph from '../wasm/swisseph.js';
 
 class SwissEph {
   // #region Constants
@@ -331,7 +331,7 @@ class SwissEph {
         
         moduleConfig.locateFile = (path, prefix) => {
           if (path.endsWith('.data') || path.endsWith('.wasm')) {
-            return join(__dirname, '../wsam', path);
+            return join(__dirname, '../wasm', path);
           }
           return prefix + path;
         };
@@ -342,13 +342,13 @@ class SwissEph {
       // Browser environment
       moduleConfig.locateFile = (path, prefix) => {
         if (path.endsWith('.data') || path.endsWith('.wasm')) {
-          return new URL('../wsam/' + path, import.meta.url).href;
+          return new URL('../wasm/' + path, import.meta.url).href;
         }
         return prefix + path;
       };
     }
 
-    this.SweModule = await WasamSwissEph(moduleConfig);
+    this.SweModule = await WasmSwissEph(moduleConfig);
 
     // Ensure HEAP32 is available
     if (!this.SweModule.HEAP32) {

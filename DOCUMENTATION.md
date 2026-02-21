@@ -20,8 +20,8 @@ Download the library files and include them in your project:
 
 ```
 src/swisseph.js       # Main library file
-wsam/swisseph.js      # WebAssembly module
-wsam/swisseph.wasm    # WebAssembly binary
+wasm/swisseph.js      # WebAssembly module
+wasm/swisseph.wasm    # WebAssembly binary
 ```
 
 ### Option 2: ES Module Import

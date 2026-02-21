@@ -63,7 +63,7 @@ pnpm add swisseph-wasm
 ## 📦 What's Included
 
 - **Core Library** (`src/swisseph.js`) - Main JavaScript wrapper
-- **WebAssembly Module** (`wsam/`) - Compiled Swiss Ephemeris
+- **WebAssembly Module** (`wasm/`) - Compiled Swiss Ephemeris
 - **Comprehensive Tests** (`tests/`) - 106 tests covering all functionality
 - **Documentation** - Complete API reference and guides
 - **Examples** - Practical usage examples and patterns
@@ -391,7 +391,7 @@ npm run test:watch      # Watch mode
 swiss-wasm/
 ├── src/
 │   └── swisseph.js              # Main library file
-├── wsam/
+├── wasm/
 │   ├── swisseph.js              # WebAssembly module
 │   └── swisseph.wasm            # WebAssembly binary
 ├── tests/

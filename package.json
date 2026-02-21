@@ -14,7 +14,7 @@
   },
   "files": [
     "src/",
-    "wsam/",
+    "wasm/",
     "types/",
     "examples/",
     "DOCUMENTATION.md",
