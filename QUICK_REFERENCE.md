@@ -256,7 +256,7 @@ async function safeCalculation() {
 your-project/
 ├── src/
 │   └── swisseph.js          # Main library
-├── wsam/
+├── wasm/
 │   ├── swisseph.js          # WASM module
 │   └── swisseph.wasm        # WASM binary
 └── your-app.js              # Your application

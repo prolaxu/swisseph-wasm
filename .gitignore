@@ -162,9 +162,9 @@ docs/build/
 # *.se3
 
 # WebAssembly build artifacts (if rebuilding from source)
-# wsam/*.o
-# wsam/*.a
-# wsam/Makefile
+# wasm/*.o
+# wasm/*.a
+# wasm/Makefile
 
 # Local configuration files
 config.local.js
