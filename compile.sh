@@ -1,5 +1,5 @@
 #!/bin/bash
-mkdir -p wsam
+mkdir -p wasm
 emcc -O3 -o swisseph.js \
     $(ls deps/swisseph/*.c | grep -v 'swetest.c' | grep -v 'swemini.c' | grep -v 'obama.c' | grep -v 'swephgen') \
     --preload-file ./deps/sweph@/sweph \
@@ -10,4 +10,4 @@ emcc -O3 -o swisseph.js \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s ENVIRONMENT="web,node" \
     -s EXPORT_ES6=1 \
-    -o wsam/swisseph.js
+    -o wasm/swisseph.js
