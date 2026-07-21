@@ -1281,143 +1281,208 @@ class SwissEph {
     return { cusps, ascmc };
   }
 
+  // swe_sol_eclipse_where(tjd, ifl, double *geopos[out], double *attr[out], serr)
+  // geopos = [lon, lat] of greatest eclipse; attr = 20 eclipse attributes.
   sol_eclipse_where(julianDay, flags) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+    const geoPtr = this.SweModule._malloc(10 * 8);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_sol_eclipse_where',
       'number',
-      ['number', 'number', 'pointer'],
-      [julianDay, flags, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer'],
+      [julianDay, flags, geoPtr, attrPtr, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const buf = this.SweModule.HEAPF64.buffer;
+    const geopos = new Float64Array(buf, geoPtr, 10).slice();
+    const attr = new Float64Array(buf, attrPtr, 20).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, geopos, attr };
   }
 
+  // swe_lun_occult_where(tjd, ipl, starname, ifl, double *geopos[out], double *attr[out], serr)
   lun_occult_where(julianDay, planet, starName, flags) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(starName.length + 1);
-    this.SweModule.stringToUTF8(starName, starBuffer, starName.length + 1);
+    const name = starName || '';
+    const nameBuf = this.SweModule._malloc(name.length + 1);
+    this.SweModule.stringToUTF8(name, nameBuf, name.length + 1);
+    const geoPtr = this.SweModule._malloc(10 * 8);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_lun_occult_where',
       'number',
-      ['number', 'number', 'pointer', 'number', 'pointer'],
-      [julianDay, planet, starBuffer, flags, resultPtr]
+      ['number', 'number', 'pointer', 'number', 'pointer', 'pointer', 'pointer'],
+      [julianDay, planet, nameBuf, flags, geoPtr, attrPtr, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const buf = this.SweModule.HEAPF64.buffer;
+    const geopos = new Float64Array(buf, geoPtr, 10).slice();
+    const attr = new Float64Array(buf, attrPtr, 20).slice();
+    this.SweModule._free(nameBuf);
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, geopos, attr };
   }
 
-  sol_eclipse_how(julianDay, flags, longitude, latitude, altitude) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+  // swe_sol_eclipse_how(tjd, ifl, double *geopos[in], double *attr[out], serr)
+  // geopos = [lon, lat, alt] of the observer.
+  sol_eclipse_how(julianDay, flags, geopos) {
+    const geoPtr = this.#allocDoubles(geopos);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_sol_eclipse_how',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, flags, longitude, latitude, altitude, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer'],
+      [julianDay, flags, geoPtr, attrPtr, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const attr = new Float64Array(this.SweModule.HEAPF64.buffer, attrPtr, 20).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, attr };
   }
 
-  sol_eclipse_when_loc(julianDayStart, flags, longitude, latitude, altitude, backward) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+  // swe_sol_eclipse_when_loc(tjd_start, ifl, geopos[in], tret[out], attr[out], backward, serr)
+  sol_eclipse_when_loc(julianDayStart, flags, geopos, backward) {
+    const geoPtr = this.#allocDoubles(geopos);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_sol_eclipse_when_loc',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDayStart, flags, longitude, latitude, altitude, backward, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer', 'number', 'pointer'],
+      [julianDayStart, flags, geoPtr, tretPtr, attrPtr, backward, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const buf = this.SweModule.HEAPF64.buffer;
+    const tret = new Float64Array(buf, tretPtr, 10).slice();
+    const attr = new Float64Array(buf, attrPtr, 20).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, tret, attr };
   }
 
-  lun_occult_when_loc(julianDayStart, planet, starName, flags, longitude, latitude, altitude, backward) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(starName.length + 1);
-    this.SweModule.stringToUTF8(starName, starBuffer, starName.length + 1);
+  // swe_lun_occult_when_loc(tjd_start, ipl, starname, ifl, geopos[in], tret[out], attr[out], backward, serr)
+  lun_occult_when_loc(julianDayStart, planet, starName, flags, geopos, backward) {
+    const name = starName || '';
+    const nameBuf = this.SweModule._malloc(name.length + 1);
+    this.SweModule.stringToUTF8(name, nameBuf, name.length + 1);
+    const geoPtr = this.#allocDoubles(geopos);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_lun_occult_when_loc',
       'number',
-      ['number', 'number', 'pointer', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDayStart, planet, starBuffer, flags, longitude, latitude, altitude, backward, resultPtr]
+      ['number', 'number', 'pointer', 'number', 'pointer', 'pointer', 'pointer', 'number', 'pointer'],
+      [julianDayStart, planet, nameBuf, flags, geoPtr, tretPtr, attrPtr, backward, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const buf = this.SweModule.HEAPF64.buffer;
+    const tret = new Float64Array(buf, tretPtr, 10).slice();
+    const attr = new Float64Array(buf, attrPtr, 20).slice();
+    this.SweModule._free(nameBuf);
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, tret, attr };
   }
 
+  // swe_sol_eclipse_when_glob(tjd_start, ifl, ifltype, tret[out], backward, serr)
   sol_eclipse_when_glob(julianDayStart, flags, eclipseType, backward) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_sol_eclipse_when_glob',
       'number',
-      ['number', 'number', 'number', 'number', 'pointer'],
-      [julianDayStart, flags, eclipseType, backward, resultPtr]
+      ['number', 'number', 'number', 'pointer', 'number', 'pointer'],
+      [julianDayStart, flags, eclipseType, tretPtr, backward, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const tret = new Float64Array(this.SweModule.HEAPF64.buffer, tretPtr, 10).slice();
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, tret };
   }
 
+  // swe_lun_occult_when_glob(tjd_start, ipl, starname, ifl, ifltype, tret[out], backward, serr)
   lun_occult_when_glob(julianDayStart, planet, starName, flags, eclipseType, backward) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(starName.length + 1);
-    this.SweModule.stringToUTF8(starName, starBuffer, starName.length + 1);
+    const name = starName || '';
+    const nameBuf = this.SweModule._malloc(name.length + 1);
+    this.SweModule.stringToUTF8(name, nameBuf, name.length + 1);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_lun_occult_when_glob',
       'number',
-      ['number', 'number', 'pointer', 'number', 'number', 'number', 'pointer'],
-      [julianDayStart, planet, starBuffer, flags, eclipseType, backward, resultPtr]
+      ['number', 'number', 'pointer', 'number', 'number', 'pointer', 'number', 'pointer'],
+      [julianDayStart, planet, nameBuf, flags, eclipseType, tretPtr, backward, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const tret = new Float64Array(this.SweModule.HEAPF64.buffer, tretPtr, 10).slice();
+    this.SweModule._free(nameBuf);
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, tret };
   }
 
-  lun_eclipse_how(julianDay, flags, longitude, latitude, altitude) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+  // swe_lun_eclipse_how(tjd_ut, ifl, double *geopos[in], double *attr[out], serr)
+  lun_eclipse_how(julianDay, flags, geopos) {
+    const geoPtr = this.#allocDoubles(geopos);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_lun_eclipse_how',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, flags, longitude, latitude, altitude, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer'],
+      [julianDay, flags, geoPtr, attrPtr, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const attr = new Float64Array(this.SweModule.HEAPF64.buffer, attrPtr, 20).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, attr };
   }
 
+  // swe_lun_eclipse_when(tjd_start, ifl, ifltype, tret[out], backward, serr)
   lun_eclipse_when(julianDayStart, flags, eclipseType, backward) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_lun_eclipse_when',
       'number',
-      ['number', 'number', 'number', 'number', 'pointer'],
-      [julianDayStart, flags, eclipseType, backward, resultPtr]
+      ['number', 'number', 'number', 'pointer', 'number', 'pointer'],
+      [julianDayStart, flags, eclipseType, tretPtr, backward, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const tret = new Float64Array(this.SweModule.HEAPF64.buffer, tretPtr, 10).slice();
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, tret };
   }
 
-  lun_eclipse_when_loc(julianDayStart, flags, longitude, latitude, altitude, backward) {
-    const resultPtr = this.SweModule._malloc(8 * Float64Array.BYTES_PER_ELEMENT);
+  // swe_lun_eclipse_when_loc(tjd_start, ifl, geopos[in], tret[out], attr[out], backward, serr)
+  lun_eclipse_when_loc(julianDayStart, flags, geopos, backward) {
+    const geoPtr = this.#allocDoubles(geopos);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const attrPtr = this.SweModule._malloc(20 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_lun_eclipse_when_loc',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDayStart, flags, longitude, latitude, altitude, backward, resultPtr]
+      ['number', 'number', 'pointer', 'pointer', 'pointer', 'number', 'pointer'],
+      [julianDayStart, flags, geoPtr, tretPtr, attrPtr, backward, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const buf = this.SweModule.HEAPF64.buffer;
+    const tret = new Float64Array(buf, tretPtr, 10).slice();
+    const attr = new Float64Array(buf, attrPtr, 20).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(attrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : { retFlag, tret, attr };
   }
 
   pheno(julianDay, planet, flags) {
@@ -1559,30 +1624,51 @@ class SwissEph {
     return result;
   }
 
-  rise_trans(julianDay, planet, longitude, latitude, altitude, flags) {
-    const resultPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
+  // swe_rise_trans(tjd_ut, ipl, starname, epheflag, rsmi, geopos[3], atpress,
+  //   attemp, double *tret[out], serr). rsmi selects rise/set/transit
+  // (SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT, SE_CALC_ITRANSIT).
+  // geopos = [lon, lat, alt]. Returns tret (event time in tret[0]) or null.
+  rise_trans(julianDay, planet, starName, epheFlag, rsmi, geopos, atpress, attemp) {
+    const name = starName || '';
+    const nameBuf = this.SweModule._malloc(name.length + 1);
+    this.SweModule.stringToUTF8(name, nameBuf, name.length + 1);
+    const geoPtr = this.#allocDoubles(geopos);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_rise_trans',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, planet, longitude, latitude, altitude, flags, resultPtr]
+      ['number', 'number', 'pointer', 'number', 'number', 'pointer', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, planet, nameBuf, epheFlag, rsmi, geoPtr, atpress, attemp, tretPtr, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const tret = new Float64Array(this.SweModule.HEAPF64.buffer, tretPtr, 10).slice();
+    this.SweModule._free(nameBuf);
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : tret;
   }
 
-  rise_trans_true_hor(julianDay, planet, longitude, latitude, altitude, flags) {
-    const resultPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
+  // As rise_trans, but with an explicit horizon height (horhgt, in degrees).
+  rise_trans_true_hor(julianDay, planet, starName, epheFlag, rsmi, geopos, atpress, attemp, horhgt) {
+    const name = starName || '';
+    const nameBuf = this.SweModule._malloc(name.length + 1);
+    this.SweModule.stringToUTF8(name, nameBuf, name.length + 1);
+    const geoPtr = this.#allocDoubles(geopos);
+    const tretPtr = this.SweModule._malloc(10 * 8);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
       'swe_rise_trans_true_hor',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, planet, longitude, latitude, altitude, flags, resultPtr]
+      ['number', 'number', 'pointer', 'number', 'number', 'pointer', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, planet, nameBuf, epheFlag, rsmi, geoPtr, atpress, attemp, horhgt, tretPtr, serrPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const tret = new Float64Array(this.SweModule.HEAPF64.buffer, tretPtr, 10).slice();
+    this.SweModule._free(nameBuf);
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(tretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : tret;
   }
 
   // Delta T with an explicit ephemeris flag (recommended over deltat()).

@@ -247,14 +247,16 @@ declare module 'swisseph-wasm' {
     azalt_rev(tjd_ut: number, calc_flag: number, geopos: number[], xin: number[]): EquatorialCoordinates;
 
     /**
-     * Calculate rise, set and transit times. Returns null on error.
+     * Rise, set or transit time. `rsmi` selects the event (SE_CALC_RISE,
+     * SE_CALC_SET, SE_CALC_MTRANSIT, SE_CALC_ITRANSIT). `starname` is '' for a
+     * planet. `geopos` = [lon, lat, alt]. Returns tret (time in tret[0]) or null.
      */
-    rise_trans(jd: number, planet: number, longitude: number, latitude: number, altitude: number, flags: number): Float64Array | null;
+    rise_trans(jd: number, planet: number, starname: string, epheFlag: number, rsmi: number, geopos: number[], atpress: number, attemp: number): Float64Array | null;
 
     /**
-     * Calculate rise/set/transit using true horizon. Returns null on error.
+     * As rise_trans but with an explicit horizon height (horhgt, degrees).
      */
-    rise_trans_true_hor(jd: number, planet: number, longitude: number, latitude: number, altitude: number, flags: number): Float64Array | null;
+    rise_trans_true_hor(jd: number, planet: number, starname: string, epheFlag: number, rsmi: number, geopos: number[], atpress: number, attemp: number, horhgt: number): Float64Array | null;
 
     /**
      * Phase, phase angle, elongation, apparent diameter and magnitude (ET). Returns null on error.
@@ -316,54 +318,61 @@ declare module 'swisseph-wasm' {
     vis_limit_mag(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, heliacalFlag: number): Float64Array | null;
 
     /**
-     * Geographic position where a solar eclipse is central/maximal. Returns null on error.
+     * Geographic position of greatest solar eclipse (geopos) plus attributes.
+     * Returns null on error.
      */
-    sol_eclipse_where(jd: number, flags: number): Float64Array | null;
+    sol_eclipse_where(jd: number, flags: number): EclipseWhere | null;
 
     /**
-     * Geographic position of a lunar occultation. Returns null on error.
+     * Geographic position of a lunar occultation plus attributes. `starName`
+     * is '' for a planet. Returns null on error.
      */
-    lun_occult_where(jd: number, planet: number, starName: string, flags: number): Float64Array | null;
+    lun_occult_where(jd: number, planet: number, starName: string, flags: number): EclipseWhere | null;
 
     /**
-     * Attributes of a solar eclipse for a given location. Returns null on error.
+     * Solar eclipse attributes for a given observer. `geopos` = [lon, lat, alt].
+     * Returns null on error.
      */
-    sol_eclipse_how(jd: number, flags: number, longitude: number, latitude: number, altitude: number): Float64Array | null;
+    sol_eclipse_how(jd: number, flags: number, geopos: number[]): EclipseHow | null;
 
     /**
-     * Local circumstances of the next/previous solar eclipse. Returns null on error.
+     * Local circumstances of the next/previous solar eclipse for an observer.
+     * `geopos` = [lon, lat, alt]. Returns null on error.
      */
-    sol_eclipse_when_loc(jdStart: number, flags: number, longitude: number, latitude: number, altitude: number, backward: number): Float64Array | null;
+    sol_eclipse_when_loc(jdStart: number, flags: number, geopos: number[], backward: number): EclipseWhen | null;
 
     /**
-     * Local circumstances of the next/previous lunar occultation. Returns null on error.
+     * Local circumstances of the next/previous lunar occultation for an observer.
+     * Returns null on error.
      */
-    lun_occult_when_loc(jdStart: number, planet: number, starName: string, flags: number, longitude: number, latitude: number, altitude: number, backward: number): Float64Array | null;
+    lun_occult_when_loc(jdStart: number, planet: number, starName: string, flags: number, geopos: number[], backward: number): EclipseWhen | null;
 
     /**
      * Global search for the next/previous solar eclipse. Returns null on error.
      */
-    sol_eclipse_when_glob(jdStart: number, flags: number, eclipseType: number, backward: number): Float64Array | null;
+    sol_eclipse_when_glob(jdStart: number, flags: number, eclipseType: number, backward: number): EclipseTimes | null;
 
     /**
      * Global search for the next/previous lunar occultation. Returns null on error.
      */
-    lun_occult_when_glob(jdStart: number, planet: number, starName: string, flags: number, eclipseType: number, backward: number): Float64Array | null;
+    lun_occult_when_glob(jdStart: number, planet: number, starName: string, flags: number, eclipseType: number, backward: number): EclipseTimes | null;
 
     /**
-     * Attributes of a lunar eclipse for a given location. Returns null on error.
+     * Lunar eclipse attributes for a given observer. `geopos` = [lon, lat, alt].
+     * Returns null on error.
      */
-    lun_eclipse_how(jd: number, flags: number, longitude: number, latitude: number, altitude: number): Float64Array | null;
+    lun_eclipse_how(jd: number, flags: number, geopos: number[]): EclipseHow | null;
 
     /**
      * Global search for the next/previous lunar eclipse. Returns null on error.
      */
-    lun_eclipse_when(jdStart: number, flags: number, eclipseType: number, backward: number): Float64Array | null;
+    lun_eclipse_when(jdStart: number, flags: number, eclipseType: number, backward: number): EclipseTimes | null;
 
     /**
-     * Local circumstances of the next/previous lunar eclipse. Returns null on error.
+     * Local circumstances of the next/previous lunar eclipse for an observer.
+     * `geopos` = [lon, lat, alt]. Returns null on error.
      */
-    lun_eclipse_when_loc(jdStart: number, flags: number, longitude: number, latitude: number, altitude: number, backward: number): Float64Array | null;
+    lun_eclipse_when_loc(jdStart: number, flags: number, geopos: number[], backward: number): EclipseWhen | null;
 
     /**
      * Set the ephemeris file search path (virtual filesystem path, e.g. 'sweph')
@@ -719,6 +728,43 @@ declare module 'swisseph-wasm' {
   export interface AstroModels {
     models: string;
     details: string;
+  }
+
+  /**
+   * Result of *_eclipse_where / lun_occult_where: geographic position plus the
+   * 20-element attribute array. `retFlag` carries the eclipse-type bits.
+   */
+  export interface EclipseWhere {
+    retFlag: number;
+    geopos: Float64Array;
+    attr: Float64Array;
+  }
+
+  /**
+   * Result of *_eclipse_how: the 20-element attribute array for an observer.
+   */
+  export interface EclipseHow {
+    retFlag: number;
+    attr: Float64Array;
+  }
+
+  /**
+   * Result of the global eclipse/occultation searches (*_when / *_when_glob):
+   * event times in tret.
+   */
+  export interface EclipseTimes {
+    retFlag: number;
+    tret: Float64Array;
+  }
+
+  /**
+   * Result of the local eclipse searches (*_when_loc): event times plus the
+   * observer attribute array.
+   */
+  export interface EclipseWhen {
+    retFlag: number;
+    tret: Float64Array;
+    attr: Float64Array;
   }
 
   /**
