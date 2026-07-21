@@ -108,6 +108,27 @@ chk('get_tid_acc', s.get_tid_acc(), C.config.get_tid_acc);
 chk('nod_aps.node_lon', s.nod_aps(2451545.0,s.SE_MOON,s.SEFLG_SWIEPH,s.SE_NODBIT_MEAN).asc_node, C.nodes.nod_aps.node_lon);
 chk('nod_aps_ut.node_lon', s.nod_aps_ut(2451545.0,s.SE_MOON,s.SEFLG_SWIEPH,s.SE_NODBIT_MEAN).asc_node, C.nodes.nod_aps_ut.node_lon);
 
+// crossings / misc
+const cr = C.crossings;
+chk('deltat_ex', s.deltat_ex(2451545.0, s.SEFLG_SWIEPH), cr.deltat_ex);
+chk('house_name', s.house_name('P'), cr.house_name);
+chk('solcross', s.solcross(0.0, 2451545.0, s.SEFLG_SWIEPH), cr.solcross);
+chk('mooncross', s.mooncross(0.0, 2451545.0, s.SEFLG_SWIEPH), cr.mooncross);
+const mcn = s.mooncross_node(2451545.0, s.SEFLG_SWIEPH);
+chk('mooncross_node.jd', mcn.jd, cr.mooncross_node.jd);
+chk('mooncross_node.lon', mcn.lon, cr.mooncross_node.lon);
+chk('helio_cross.jd', s.helio_cross(s.SE_MARS, 0.0, 2451545.0, s.SEFLG_SWIEPH, 1), cr.helio_cross.jd);
+chk('gauquelin_sector', s.gauquelin_sector(2451545.0, s.SE_SUN, '', s.SEFLG_SWIEPH, 0, [8.0,47.0,400.0], 1013.25, 15.0), cr.gauquelin_sector.sector);
+
+// misc
+const mi = C.misc;
+chk('calc_pctr.lon', s.calc_pctr(2451545.0, s.SE_MARS, s.SE_EARTH, s.SEFLG_SWIEPH)?.[0], mi.calc_pctr.lon);
+chk('lat_to_lmt', s.lat_to_lmt(2451545.0, 8.0), mi.lat_to_lmt);
+chk('lmt_to_lat', s.lmt_to_lat(2451545.0, 8.0), mi.lmt_to_lat);
+const fd = s.get_current_file_data(0);
+chk('get_current_file_data.denum', fd.denum, mi.get_current_file_data.denum);
+chk('get_current_file_data.start', fd.start, mi.get_current_file_data.start);
+
 // strings
 chk('cs2timestr', s.cs2timestr(12.5,' ',true), C.strings.cs2timestr);
 chk('cs2lonlatstr', s.cs2lonlatstr(123.456,'E','W'), C.strings.cs2lonlatstr);

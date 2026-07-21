@@ -233,7 +233,49 @@ int main() {
     printf("    \"nod_aps_ut\": {\"retval\": %d, \"node_lon\": %.15f}\n", retval, xnasc[0]);
     
     printf("  }"); print_comma();
-    
+
+    // === Crossings / misc ===
+    printf("  \"crossings\": {\n");
+
+    printf("    \"deltat_ex\": %.15f", swe_deltat_ex(2451545.0, SEFLG_SWIEPH, serr)); print_comma();
+    printf("    \"house_name\": \"%s\"", swe_house_name('P')); print_comma();
+    printf("    \"solcross\": %.15f", swe_solcross(0.0, 2451545.0, SEFLG_SWIEPH, serr)); print_comma();
+    printf("    \"mooncross\": %.15f", swe_mooncross(0.0, 2451545.0, SEFLG_SWIEPH, serr)); print_comma();
+
+    double mcn_xlon, mcn_xlat;
+    double mcn_jd = swe_mooncross_node(2451545.0, SEFLG_SWIEPH, &mcn_xlon, &mcn_xlat, serr);
+    printf("    \"mooncross_node\": {\"jd\": %.15f, \"lon\": %.15f}", mcn_jd, mcn_xlon); print_comma();
+
+    double hc_jd;
+    int32 hc_ret = swe_helio_cross(SE_MARS, 0.0, 2451545.0, SEFLG_SWIEPH, 1, &hc_jd, serr);
+    printf("    \"helio_cross\": {\"retval\": %d, \"jd\": %.15f}", hc_ret, hc_jd); print_comma();
+
+    double gq_dgsect;
+    char gqname[41]; gqname[0] = '\0';
+    int32 gq_ret = swe_gauquelin_sector(2451545.0, SE_SUN, gqname, SEFLG_SWIEPH, 0, geopos, 1013.25, 15.0, &gq_dgsect, serr);
+    printf("    \"gauquelin_sector\": {\"retval\": %d, \"sector\": %.15f}\n", gq_ret, gq_dgsect);
+
+    printf("  }"); print_comma();
+
+    // === Misc (planetocentric, local time, file data) ===
+    printf("  \"misc\": {\n");
+
+    double pctr[6];
+    int32 pctr_ret = swe_calc_pctr(2451545.0, SE_MARS, SE_EARTH, SEFLG_SWIEPH, pctr, serr);
+    printf("    \"calc_pctr\": {\"retval\": %d, \"lon\": %.15f}", pctr_ret, pctr[0]); print_comma();
+
+    double lmt_out, lat_out;
+    swe_lat_to_lmt(2451545.0, 8.0, &lmt_out, serr);
+    printf("    \"lat_to_lmt\": %.15f", lmt_out); print_comma();
+    swe_lmt_to_lat(2451545.0, 8.0, &lat_out, serr);
+    printf("    \"lmt_to_lat\": %.15f", lat_out); print_comma();
+
+    double tfstart, tfend; int fdenum;
+    swe_get_current_file_data(0, &tfstart, &tfend, &fdenum);
+    printf("    \"get_current_file_data\": {\"denum\": %d, \"start\": %.15f}\n", fdenum, tfstart);
+
+    printf("  }"); print_comma();
+
     // === String Formatting ===
     printf("  \"strings\": {\n");
     
