@@ -1,3 +1,7 @@
 [submodule "deps/swisseph"]
 	path = deps/swisseph
 	url = https://github.com/aloistr/swisseph.git
+	# Build-only source dep, bootstrapped by init-dependency.sh as a shallow
+	# sparse clone. Ignore its checkout state so it never dirties git status
+	# or gets its pin bumped by accident.
+	ignore = all
