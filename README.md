@@ -26,6 +26,8 @@ A high-precision JavaScript wrapper for the Swiss Ephemeris WebAssembly module, 
 
 **Try it now**: [Interactive SwissEph Demo](https://prolaxu.github.io/swisseph-wasm/examples/demo.html)
 
+**Playground** (live code editor with autocomplete on the full API): [prolaxu.github.io/swisseph-wasm/examples/playground.html](https://prolaxu.github.io/swisseph-wasm/examples/playground.html)
+
 Experience all features including:
 - 🌍 Real-time planetary positions
 - 🎂 Birth chart calculations
@@ -53,12 +55,62 @@ pnpm add swisseph-wasm
 ```
 
 ### CDN (Browser)
+
 ```html
 <script type="module">
-  import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js';
+  // Pin a version tag — NOT @main. jsDelivr caches branch refs for hours,
+  // so @main can serve stale code.
+  import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@v0.1.0/src/swisseph.js';
   // Your code here
 </script>
 ```
+
+> **Two things to get right in the browser:**
+> 1. **Pin a version** (`@v0.1.0`), not `@main` — branch refs are cached stale by the CDN.
+> 2. **`initSwissEph()` is async and downloads ~2.1 MB of ephemeris data.** Wait for it to resolve before calling any method, and gate your UI on it — calling a method before init throws `SwissEph not initialized. Call await initSwissEph() first.`
+
+Complete, race-free example:
+
+```html
+<!DOCTYPE html>
+<html>
+<head><title>SwissEph Example</title></head>
+<body>
+  <button id="calc" disabled>Loading…</button>
+  <div id="result"></div>
+
+  <script type="module">
+    import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@v0.1.0/src/swisseph.js';
+
+    const btn = document.getElementById('calc');
+    const result = document.getElementById('result');
+    let swe = null;
+
+    (async () => {
+      try {
+        swe = new SwissEph();
+        await swe.initSwissEph();          // downloads ~2.1 MB ephemeris data
+        btn.disabled = false;
+        btn.textContent = 'Calculate Sun Position';
+      } catch (err) {
+        console.error('Failed to initialize SwissEph:', err);
+        result.textContent = 'Init failed: ' + err.message;
+      }
+    })();
+
+    btn.addEventListener('click', () => {
+      const jd = swe.julday(2023, 6, 15, 12.0);
+      const sun = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SWIEPH);  // Float64Array
+      result.textContent = `Sun: ${sun[0].toFixed(2)}°`;
+    });
+
+    window.addEventListener('beforeunload', () => swe && swe.close());
+  </script>
+</body>
+</html>
+```
+
+For production, prefer `npm install swisseph-wasm` with a bundler (Vite/webpack) over the raw-file CDN.
 
 ## 📦 What's Included
 
@@ -269,7 +321,7 @@ export default AstrologyCalculator;
     <div id="result"></div>
 
     <script type="module">
-        import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js';
+        import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@v0.1.0/src/swisseph.js';
 
         let swe = null;
         let isInitialized = false;
@@ -560,16 +612,18 @@ try {
 ```
 
 #### CDN Import Issues
-**Error**: Module not found when using CDN
+**Error**: Module not found, stale code, or "SwissEph not initialized" when using the CDN
 
-**Solution**: Use the correct CDN URL:
+**Solution**: Import `src/swisseph.js` from a **pinned version tag** (not `@main`), and wait for `initSwissEph()` before calling any method:
 ```javascript
-// ✅ Correct
-import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js';
+// ✅ Correct — pinned tag, keeps relative ../wasm/ paths intact
+import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@v0.1.0/src/swisseph.js';
 
-// ❌ Incorrect
+// ⚠️ Avoid @main — jsDelivr caches branch refs for hours and may serve stale code
+// ❌ Incorrect — bare npm entry does not resolve the WASM assets in the browser
 import SwissEph from 'https://cdn.jsdelivr.net/npm/swisseph-wasm';
 ```
+If you get `SwissEph not initialized. Call await initSwissEph() first.`, you called a method before init finished — `initSwissEph()` downloads ~2.1 MB of ephemeris data, so `await` it (and gate any UI on it) before use.
 
 #### TypeScript Errors
 **Error**: Type definitions not found
