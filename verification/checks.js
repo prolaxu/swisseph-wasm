@@ -1,16 +1,41 @@
 // Shared JS(wasm)-vs-C reference checks, used by both the Node harness
 // (compare_wasm_vs_c.mjs) and the in-browser harness (browser_test.html).
-// `s` is an initialized SwissEph instance; `C` is the parsed c_ref.json.
-// Returns { pass, fail, fails: string[] }.
-export function runChecks(s, C, TOL = 1e-6) {
+// `swe` is an initialized SwissEph instance; `C` is the parsed reference.json.
+// Returns { pass, fail, fails: string[], details: [...] } where each detail is
+// { name, call, expected, got, ok, diff } — call/args captured via a proxy so
+// the browser harness can show exactly what ran.
+export function runChecks(swe, C, TOL = 1e-6) {
   let pass = 0, fail = 0;
   const fails = [];
+  const details = [];
+
+  // Log every wrapped-method call (name + args) made while evaluating a check.
+  const callLog = [];
+  const s = new Proxy(swe, {
+    get(target, prop) {
+      const v = target[prop];
+      if (typeof v === 'function') {
+        return (...args) => { const r = v.apply(target, args); callLog.push({ fn: prop, args }); return r; };
+      }
+      return v;
+    },
+  });
+
+  const fmtArg = a => {
+    if (typeof a === 'string') return `'${a}'`;
+    if (Array.isArray(a)) return `[${a.map(fmtArg).join(',')}]`;
+    if (typeof a === 'number') return Number.isInteger(a) ? String(a) : a.toFixed(4).replace(/\.?0+$/, '');
+    return String(a);
+  };
 
   function chk(name, got, exp) {
+    const call = callLog.splice(0).map(c => `${c.fn}(${c.args.map(fmtArg).join(', ')})`).join('  →  ') || '(prev result)';
     let ok;
     if (typeof exp === 'number') ok = Number.isFinite(got) && Math.abs(got - exp) < TOL;
     else if (typeof exp === 'string') ok = String(got).includes(exp) || got === exp;
     else ok = got === exp;
+    const diff = (typeof exp === 'number' && typeof got === 'number') ? Math.abs(got - exp) : null;
+    details.push({ name, call, expected: exp, got, ok, diff });
     if (ok) { pass++; }
     else { fail++; fails.push(`${name}: got=${JSON.stringify(got)} exp=${JSON.stringify(exp)}`); }
   }
@@ -148,5 +173,5 @@ export function runChecks(s, C, TOL = 1e-6) {
   // version
   chk('version', s.version(), C.version);
 
-  return { pass, fail, fails };
+  return { pass, fail, fails, details };
 }

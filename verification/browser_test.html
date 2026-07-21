@@ -2,54 +2,146 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>SwissEph WASM — Browser Verification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwissEph WASM — Verification (JS vs C)</title>
   <style>
-    body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem; background: #111; color: #eee; }
-    h1 { font-size: 1.2rem; }
-    #summary { font-size: 1.1rem; font-weight: 700; padding: .5rem 0; }
-    .ok { color: #4ade80; }
-    .bad { color: #f87171; }
-    pre { background: #1b1b1b; padding: 1rem; border-radius: 6px; overflow: auto; max-height: 60vh; }
+    :root {
+      --bg:#0b1020; --panel:#131a2e; --panel2:#1b2440; --line:#263252;
+      --text:#e7ecf5; --muted:#93a0bd; --ok:#34d399; --bad:#f87171; --accent:#60a5fa;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      background:radial-gradient(1200px 600px at 70% -10%,#16213f,var(--bg) 55%) fixed; color:var(--text); }
+    header { max-width:1160px; margin:0 auto; padding:26px 20px 6px; }
+    h1 { font-size:1.35rem; margin:0; }
+    .sub { color:var(--muted); margin:6px 0 0; }
+    .sub code { color:#cdd7ee; }
+
+    main { max-width:1160px; margin:0 auto; padding:14px 20px 60px; }
+    .bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:var(--panel);
+      border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+    .big { font-size:1.15rem; font-weight:800; letter-spacing:.02em; }
+    .pill { padding:3px 10px; border-radius:999px; font-weight:700; font-size:.82rem; }
+    .pill.ok { background:rgba(52,211,153,.15); color:var(--ok); border:1px solid rgba(52,211,153,.35); }
+    .pill.bad { background:rgba(248,113,113,.15); color:var(--bad); border:1px solid rgba(248,113,113,.35); }
+    .meta { color:var(--muted); font-size:.85rem; }
+    .spacer { flex:1; }
+    label.toggle { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:.85rem; cursor:pointer; user-select:none; }
+    input[type=search] { background:var(--panel2); border:1px solid var(--line); color:var(--text);
+      padding:7px 10px; border-radius:8px; font:inherit; font-size:.85rem; min-width:200px; }
+
+    table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line);
+      border-radius:12px; overflow:hidden; }
+    thead th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+      padding:10px 12px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel2); }
+    tbody td { padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    tbody tr:hover { background:rgba(96,165,250,.05); }
+    tr.fail { background:rgba(248,113,113,.06); }
+    .status { font-weight:700; font-size:.8rem; }
+    .status.ok { color:var(--ok); } .status.bad { color:var(--bad); }
+    .call { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82rem; color:#bcd0ff; word-break:break-word; }
+    .name { color:var(--muted); font-size:.78rem; }
+    .val { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82rem; font-variant-numeric:tabular-nums; }
+    .val.exp { color:#cdd7ee; } .val.got.ok { color:var(--ok); } .val.got.bad { color:var(--bad); }
+    .diff { color:var(--muted); font-size:.75rem; font-family:ui-monospace,monospace; }
+    .loading, .err { padding:40px; text-align:center; color:var(--muted); }
+    .err { color:var(--bad); }
+    footer { max-width:1160px; margin:0 auto; padding:0 20px 40px; color:var(--muted); font-size:.82rem; }
+    a { color:var(--accent); }
   </style>
 </head>
 <body>
-  <h1>Swiss Ephemeris WASM — in-browser verification</h1>
-  <div id="summary">Running…</div>
-  <pre id="log"></pre>
+  <header>
+    <h1>🔬 Verification — JS (WebAssembly) vs C reference</h1>
+    <p class="sub">Every wrapped method is run in the browser and diffed against <code>reference.json</code> — values produced by the native Swiss Ephemeris C library. Tolerance <code>1e-6</code>.</p>
+  </header>
+
+  <main>
+    <div class="bar" id="bar">
+      <span class="big" id="headline">Running…</span>
+    </div>
+    <div id="tablewrap"><div class="loading">Loading WebAssembly module and reference…</div></div>
+  </main>
+
+  <footer>
+    Runs the same checks as <code>npm run verify</code> (Node). Source:
+    <a href="checks.js">checks.js</a> · <a href="generate_all_outputs.c">generate_all_outputs.c</a> · <a href="../examples/playground.html">Playground</a>
+  </footer>
 
   <script type="module">
     import SwissEph from '../src/swisseph.js';
     import { runChecks } from './checks.js';
 
-    const logEl = document.getElementById('log');
-    const sumEl = document.getElementById('summary');
-    const log = (m) => { logEl.textContent += m + '\n'; };
+    const wrap = document.getElementById('tablewrap');
+    const bar = document.getElementById('bar');
+
+    const esc = s => String(s).replace(/[&<>]/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[m]));
+    const fmtVal = v => {
+      if (v === null || v === undefined) return String(v);
+      if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+      return esc(v);
+    };
 
     (async () => {
+      let C, s;
       try {
-        const C = await (await fetch('./reference.json')).json();
-        const s = new SwissEph();
+        C = await (await fetch('./reference.json')).json();
+        s = new SwissEph();
         await s.initSwissEph();
-        log('initSwissEph() OK — swe_version = ' + s.version());
-
-        const { pass, fail, fails } = runChecks(s, C);
-        s.close();
-
-        // Signal completion for automation (window + a global).
-        window.__RESULT__ = { pass, fail, fails };
-
-        sumEl.textContent = `RESULT: PASS ${pass}  FAIL ${fail}`;
-        sumEl.className = fail ? 'bad' : 'ok';
-        if (fails.length) { log('\nMISMATCHES:'); fails.forEach(f => log('  x ' + f)); }
-        else log('\nAll checks matched the C reference.');
-        log('\n__DONE__');
       } catch (e) {
-        window.__RESULT__ = { error: String(e && e.stack || e) };
-        sumEl.textContent = 'ERROR: ' + (e && e.message || e);
-        sumEl.className = 'bad';
-        log('ERROR: ' + (e && e.stack || e));
-        log('\n__DONE__');
+        wrap.innerHTML = `<div class="err">Failed to load: ${esc(e.message || e)}</div>`;
+        bar.innerHTML = `<span class="big" style="color:var(--bad)">ERROR</span>`;
+        return;
       }
+
+      const swever = s.version();
+      const { pass, fail, details } = runChecks(s, C);
+      s.close();
+
+      window.__RESULT__ = { pass, fail };
+
+      bar.innerHTML = `
+        <span class="pill ${fail ? 'bad' : 'ok'}">${fail ? '✗ ' + fail + ' FAILED' : '✓ ALL PASS'}</span>
+        <span class="big">${pass}/${pass + fail} checks</span>
+        <span class="meta">swe ${esc(swever)} · tolerance 1e-6</span>
+        <span class="spacer"></span>
+        <input type="search" id="filter" placeholder="filter by function / name…" />
+        <label class="toggle"><input type="checkbox" id="onlyfail"> failures only</label>`;
+
+      const rows = details.map((d, i) => `
+        <tr class="row ${d.ok ? '' : 'fail'}" data-fail="${d.ok ? 0 : 1}" data-key="${esc((d.call + ' ' + d.name).toLowerCase())}">
+          <td class="meta">${i + 1}</td>
+          <td><div class="call">${esc(d.call)}</div><div class="name">${esc(d.name)}</div></td>
+          <td class="val exp">${fmtVal(d.expected)}</td>
+          <td class="val got ${d.ok ? 'ok' : 'bad'}">${fmtVal(d.got)}</td>
+          <td class="diff">${d.diff === null ? '' : (d.diff === 0 ? '0' : d.diff.toExponential(2))}</td>
+          <td class="status ${d.ok ? 'ok' : 'bad'}">${d.ok ? 'PASS' : 'FAIL'}</td>
+        </tr>`).join('');
+
+      wrap.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>#</th><th>Function called (args) · check</th><th>Expected (C)</th>
+            <th>Returned (wasm)</th><th>Δ</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tbody">${rows}</tbody>
+        </table>`;
+
+      const filter = document.getElementById('filter');
+      const onlyfail = document.getElementById('onlyfail');
+      const apply = () => {
+        const q = filter.value.trim().toLowerCase();
+        const ff = onlyfail.checked;
+        for (const tr of document.querySelectorAll('.row')) {
+          const show = (!ff || tr.dataset.fail === '1') && (!q || tr.dataset.key.includes(q));
+          tr.style.display = show ? '' : 'none';
+        }
+      };
+      filter.addEventListener('input', apply);
+      onlyfail.addEventListener('change', apply);
+
+      // Signal completion for automation.
+      document.title = `Verification: ${pass}/${pass + fail} — ${fail ? 'FAIL' : 'PASS'}`;
     })();
   </script>
 </body>
