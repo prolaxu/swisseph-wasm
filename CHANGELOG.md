@@ -4,7 +4,7 @@ All notable changes to this project are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/) (pre-1.0: breaking changes bump
 the minor version).
 
-## [0.1.0]
+## [0.1.0] - 2026-07-21
 
 Correctness release. Every wrapped method is now verified against the genuine
 Swiss Ephemeris C library (v2.10.03), in both Node and the browser.
