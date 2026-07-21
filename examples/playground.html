@@ -56,6 +56,72 @@
     })();
   </script>
 
+  <!-- Full Vedic birth-chart example (kept as text/plain to avoid escaping). -->
+  <script type="text/plain" id="ex-vedic">// Full Vedic (sidereal) birth chart — the parts Swiss Ephemeris computes directly.
+// Input: 2026-07-21 13:50:43, GMT-4, South Grafton MA (71W41'10", 42N12'10", 425 m)
+const tzHours = -4;
+const utHour = (13 + 50/60 + 43/3600) - tzHours;   // UT = local + 4h
+const lat = 42 + 12/60 + 10/3600, lon = -(71 + 41/60 + 10/3600);
+const jd = swisseph.julday(2026, 7, 21, utHour);
+swisseph.set_sid_mode(27, 0, 0);                    // SE_SIDM_TRUE_CITRA (JHora "Lahiri")
+const FL = swisseph.SEFLG_SWIEPH | swisseph.SEFLG_SIDEREAL;
+
+const SIGN = ['Ar','Ta','Ge','Cn','Le','Vi','Li','Sc','Sg','Cp','Aq','Pi'];
+const NAK = ['Aswi','Bhar','Krit','Rohi','Mrig','Ardr','Puna','Push','Asre','Magh','PPha','UPha','Hast','Chit','Swat','Visa','Anu','Jye','Mool','PSha','USha','Srav','Dhan','Sata','PBha','UBha','Reva'];
+const TITHI = ['Pratipada','Dwitiya','Tritiya','Chaturthi','Panchami','Shashthi','Saptami','Ashtami','Navami','Dashami','Ekadashi','Dwadashi','Trayodashi','Chaturdashi','Purnima/Amavasya'];
+const YOGA = ['Vishkambha','Priti','Ayushman','Saubhagya','Shobhana','Atiganda','Sukarma','Dhriti','Shula','Ganda','Vriddhi','Dhruva','Vyaghata','Harshana','Vajra','Siddhi','Vyatipata','Variyan','Parigha','Shiva','Siddha','Sadhya','Shubha','Shukla','Brahma','Indra','Vaidhriti'];
+const KAR = ['Bava','Balava','Kaulava','Taitila','Gara','Vanija','Vishti'];
+const WD = ['Monday (Mo)','Tuesday (Ma)','Wednesday (Me)','Thursday (Ju)','Friday (Ve)','Saturday (Sa)','Sunday (Su)'];
+
+const norm = x => ((x % 360) + 360) % 360;
+const fmtLon = l => { const w=l%30,d=Math.floor(w),mf=(w-d)*60,mi=Math.floor(mf),se=(mf-mi)*60;
+  return String(d).padStart(2)+' '+SIGN[Math.floor(l/30)]+' '+String(mi).padStart(2,'0')+"' "+se.toFixed(2).padStart(5,'0')+'"'; };
+const nak = l => { const i=Math.floor(l/(13+1/3)), pada=Math.floor((l%(13+1/3))/(10/3))+1; return {name:NAK[i%27],pada}; };
+const navamsa = l => SIGN[Math.floor(l/(10/3))%12];
+const hms = h => { h=((h%24)+24)%24; const H=Math.floor(h),m=Math.floor((h-H)*60),s=Math.round(((h-H)*60-m)*60); return H+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); };
+const sid = p => norm(swisseph.calc_ut(jd, p, FL)[0]);
+
+print('Natal Chart\n');
+print('Date:  July 21, 2026   Time: 13:50:43   TZ: 4:00 West of GMT');
+print("Place: 71 W 41' 10\", 42 N 12' 10\" (South Grafton, MA)   Alt: 425 m\n");
+
+const sunL = sid(swisseph.SE_SUN), moonL = sid(swisseph.SE_MOON);
+const diff = norm(moonL - sunL);
+const tno = Math.floor(diff/12), kIdx = Math.floor(diff/6);
+print('Tithi:         ' + (tno<15?'Sukla':'Krishna') + ' ' + TITHI[tno%15] + ' (' + ((1-(diff/12-tno))*100).toFixed(2) + '% left)');
+print('Vedic Weekday: ' + WD[swisseph.day_of_week(jd)]);
+const mnk = nak(moonL);
+print('Nakshatra:     ' + mnk.name + ' (pada ' + mnk.pada + ')');
+print('Yoga:          ' + YOGA[Math.floor(norm(sunL+moonL)/(13+1/3))]);
+print('Karana:        ' + (kIdx===0?'Kimstughna':kIdx>=58?['Shakuni','Chatushpada','Naga'][kIdx-58]:KAR[(kIdx-1)%7]));
+
+const RISE = swisseph.SE_CALC_RISE | swisseph.SE_BIT_DISC_CENTER | swisseph.SE_BIT_NO_REFRACTION;
+const SET  = swisseph.SE_CALC_SET  | swisseph.SE_BIT_DISC_CENTER | swisseph.SE_BIT_NO_REFRACTION;
+const toLocal = t => (t - Math.floor(t-0.5) - 0.5)*24 + tzHours;
+const rise = swisseph.rise_trans(jd-0.7, swisseph.SE_SUN, '', swisseph.SEFLG_SWIEPH, RISE, [lon,lat,425], 1013.25, 15);
+const sset = swisseph.rise_trans(jd-0.7, swisseph.SE_SUN, '', swisseph.SEFLG_SWIEPH, SET,  [lon,lat,425], 1013.25, 15);
+print('\nSunrise:       ' + hms(toLocal(rise[0])) + '   Sunset: ' + hms(toLocal(sset[0])));
+const a = swisseph.get_ayanamsa_ut(jd), ad=Math.floor(a), amf=(a-ad)*60, ami=Math.floor(amf), ase=(amf-ami)*60;
+print('Ayanamsa:      ' + ad + '-' + String(ami).padStart(2,'0') + '-' + ase.toFixed(2));
+print('Sidereal Time: ' + hms(swisseph.sidtime(jd) + lon/15));
+
+print('\nBody         Longitude          Nak  Pada Rasi Nav');
+const rahu = sid(swisseph.SE_MEAN_NODE), ketu = norm(rahu+180);
+const lag = swisseph.houses_ex(jd, swisseph.SEFLG_SIDEREAL, lat, lon, 'P').ascmc[0];
+const rows = [['Lagna',lag],['Sun',sunL],['Moon',moonL],['Mars',sid(swisseph.SE_MARS)],['Mercury',sid(swisseph.SE_MERCURY)],['Jupiter',sid(swisseph.SE_JUPITER)],['Venus',sid(swisseph.SE_VENUS)],['Saturn',sid(swisseph.SE_SATURN)],['Rahu',rahu],['Ketu',ketu]];
+for (const [n,l] of rows) { const k=nak(l); print(n.padEnd(11)+' '+fmtLon(l)+'  '+k.name.padEnd(4)+' '+String(k.pada).padEnd(4)+' '+SIGN[Math.floor(l/30)].padEnd(4)+' '+navamsa(l)); }
+
+print('\nChara Karakas (Jaimini, by degrees within sign):');
+const KL=['AK','AmK','BK','MK','PiK','PK','GK','DK'];
+const kb=[['Sun',sunL],['Moon',moonL],['Mars',sid(swisseph.SE_MARS)],['Mercury',sid(swisseph.SE_MERCURY)],['Jupiter',sid(swisseph.SE_JUPITER)],['Venus',sid(swisseph.SE_VENUS)],['Saturn',sid(swisseph.SE_SATURN)],['Rahu',rahu]];
+kb.map(([n,l])=>[n, n==='Rahu'?30-(l%30):l%30]).sort((x,y)=>y[1]-x[1]).forEach(([n],i)=>print(KL[i].padEnd(4)+' '+n));
+
+print('\n--- Swiss Ephemeris provides the above (positions, Lagna, ayanamsa,');
+print('sidereal time, rise/set). Dasas, divisional charts (D-1..D-144),');
+print('Ashtakavarga, Shadbala, Vimshopaka and avasthas are separate jyotish');
+print('computations layered on top of these ephemeris values.');
+</script>
+
   <!-- Monaco editor (AMD loader from CDN). -->
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
   <script>
@@ -100,16 +166,10 @@ const d = swisseph.revjul(tret[0], swisseph.SE_GREG_CAL);
 print('Sunrise (UT):', d.hour.toFixed(4) + 'h on ' + d.year + '-' + d.month + '-' + d.day);`,
     };
 
-    const DEFAULT_CODE = `// The API is ready as \`swisseph\`. Type "swisseph." for autocomplete.
-const jd = swisseph.julday(2000, 1, 1, 12);
-print('Julian Day:', jd);
-
-const sun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH);
-print('Sun longitude:', sun.longitude.toFixed(4) + '\\u00b0');
-
-const h = swisseph.houses(jd, 47.0, 8.0, 'P');
-print('Ascendant:', h.ascmc[0].toFixed(4) + '\\u00b0');
-`;
+    // The full Vedic birth chart lives in a text/plain block (no escaping needed).
+    const VEDIC = (document.getElementById('ex-vedic') || {}).textContent || '';
+    EXAMPLES['Full Vedic birth chart (sidereal)'] = VEDIC;
+    const DEFAULT_CODE = VEDIC;
 
     const out = document.getElementById('output');
     const statusEl = document.getElementById('status');
