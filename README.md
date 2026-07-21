@@ -393,20 +393,59 @@ The bundled files are:
 
 **Date coverage** of the bundled `.se1` files is approximately **1800–2400 AD**. That range covers the vast majority of astrological and astronomical use cases without any extra configuration.
 
-### Rebuilding with additional `.se1` files
+> Note: `compile.sh` preloads each required data file explicitly (see the list above). The `seas_18.se1` asteroid-name file `seasnam.txt` (~9.5 MB) is intentionally **not** bundled, since no exported function reads it — this keeps `swisseph.data` small.
 
-To support dates outside ~1800–2400 AD (or to add more asteroids), rebuild the WASM data bundle with additional ephemeris files:
+## 🛠️ Building from source
+
+The prebuilt `wasm/` directory is committed, so **you do not need to build anything to use the library**. Rebuild only when you change the C sources, the bundled ephemeris data, or the exported function list.
+
+### Prerequisites
+
+- **Emscripten SDK (`emcc`)** — the C→WebAssembly compiler. Install and activate it once:
+
+  ```bash
+  git clone https://github.com/emscripten-core/emsdk.git
+  cd emsdk
+  ./emsdk install latest
+  ./emsdk activate latest
+  source ./emsdk_env.sh        # puts emcc on your PATH for this shell
+  ```
+
+  See <https://emscripten.org/docs/getting_started/downloads.html> for details. This build is known to work with Emscripten 3.x.
+
+- **Node.js ≥ 14** — to run the test suite.
+
+### Source layout
+
+- `deps/swisseph/` — the **vendored** Swiss Ephemeris C source (currently v2.10.03). It is committed directly (no git submodule), so builds are offline and deterministic.
+- `deps/sweph/` — the ephemeris data files preloaded into the virtual filesystem at `/sweph`.
+
+### Build steps
+
+```bash
+./init-dependency.sh    # preflight: verifies source, data and emcc are present
+./compile.sh            # compiles deps/swisseph -> wasm/swisseph.{js,wasm,data}
+npm test                # runs the test suite against the freshly built wasm/
+```
+
+### Changing the vendored Swiss Ephemeris version
+
+```bash
+./update-swisseph.sh              # pull latest upstream master
+./update-swisseph.sh v2.10.03     # or pin a specific tag/commit
+git diff deps/swisseph            # review the change, then ./compile.sh && npm test
+```
+
+`update-swisseph.sh` does a shallow, blobless, sparse fetch of the upstream `*.c`/`*.h` only — it never downloads the hundreds of MB of ephemeris data that upstream bundles alongside its source.
+
+### Adding ephemeris files for other date ranges
+
+To support dates outside ~1800–2400 AD (or to add more asteroids):
 
 1. Download the `.se1` files you need from the official archive:
    <https://www.astro.com/ftp/swisseph/ephe/>
-2. Place them in `deps/sweph/` in this repository.
-3. Run the build script:
-
-   ```bash
-   ./compile.sh
-   ```
-
-   The script preloads that directory into the virtual filesystem via Emscripten's `--preload-file ./deps/sweph@/sweph`, so any files you add appear under `/sweph` at runtime — exactly where the engine already looks.
+2. Place them in `deps/sweph/`.
+3. Add a matching `--preload-file ./deps/sweph/<file>@/sweph/<file>` line to `compile.sh`, then run `./compile.sh`. The files then appear under `/sweph` at runtime — exactly where the engine looks.
 
 ## 🧪 Testing
 
