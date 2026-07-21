@@ -287,9 +287,31 @@ declare module 'swisseph-wasm' {
     nod_aps_ut(jd: number, planet: number, flags: number, method: number): NodesApsidesResult;
 
     /**
-     * Osculating orbital elements. Returns the raw C return code.
+     * Osculating orbital elements (up to 50 values). Returns null on error.
      */
-    get_orbital_elements(jd: number, planet: number, flags: number): number;
+    get_orbital_elements(jd: number, planet: number, flags: number): Float64Array | null;
+
+    /**
+     * Max, min and true distance of a planet over its orbit. Returns null on error.
+     */
+    orbit_max_min_true_distance(jd: number, planet: number, flags: number): OrbitDistance | null;
+
+    /**
+     * Heliacal rising/setting event times. Returns null on error.
+     * geoPos = [lon, lat, alt]; atmosData = [pressure, temp, humidity, meteoRange];
+     * observerData = 6 observer parameters.
+     */
+    heliacal_ut(jdStart: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, eventType: number, flags: number): Float64Array | null;
+
+    /**
+     * Heliacal phenomena details. Returns null on error.
+     */
+    heliacal_pheno_ut(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, eventType: number, heliacalFlag: number): Float64Array | null;
+
+    /**
+     * Visual limiting magnitude for an object. Returns null on error.
+     */
+    vis_limit_mag(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, heliacalFlag: number): Float64Array | null;
 
     /**
      * Geographic position where a solar eclipse is central/maximal. Returns null on error.
@@ -340,6 +362,156 @@ declare module 'swisseph-wasm' {
      * Local circumstances of the next/previous lunar eclipse. Returns null on error.
      */
     lun_eclipse_when_loc(jdStart: number, flags: number, longitude: number, latitude: number, altitude: number, backward: number): Float64Array | null;
+
+    /**
+     * Set the ephemeris file search path (virtual filesystem path, e.g. 'sweph')
+     */
+    set_ephe_path(path: string): string;
+
+    /**
+     * Set the JPL ephemeris file name
+     */
+    set_jpl_file(filename: string): string;
+
+    /**
+     * Set atmospheric lapse rate used by refraction
+     */
+    set_lapse_rate(lapseRate: number): void;
+
+    /**
+     * Get the current tidal acceleration of the Moon
+     */
+    get_tid_acc(): number;
+
+    /**
+     * Set the tidal acceleration of the Moon
+     */
+    set_tid_acc(acceleration: number): void;
+
+    /**
+     * Equation of time (difference between apparent and mean solar time)
+     */
+    time_equ(jd: number): number;
+
+    /**
+     * Sidereal time with explicit obliquity and nutation
+     */
+    sidtime0(jd: number, eps: number, nut: number): number;
+
+    /**
+     * Ayanamsa (UT)
+     */
+    get_ayanamsa_ut(jd: number): number;
+
+    /**
+     * Ayanamsa with ephemeris flag (ET). Returns null on error.
+     */
+    get_ayanamsa_ex(jd: number, ephemerisFlag: number): number | null;
+
+    /**
+     * Ayanamsa with ephemeris flag (UT). Returns null on error.
+     */
+    get_ayanamsa_ex_ut(jd: number, ephemerisFlag: number): number | null;
+
+    /**
+     * Name of a sidereal (ayanamsa) mode
+     */
+    get_ayanamsa_name(siderealMode: number): string;
+
+    /**
+     * Convert ET Julian Day to UTC calendar components
+     */
+    jdet_to_utc(jd: number, gregflag: number): UTCDateComponents;
+
+    /**
+     * Convert UT1 Julian Day to UTC calendar components
+     */
+    jdut1_to_utc(jd: number, gregflag: number): UTCDateComponents;
+
+    /**
+     * Apply a timezone offset to a UTC date, returning local calendar components
+     */
+    utc_time_zone(year: number, month: number, day: number, hour: number, minute: number, second: number, timezone: number): UTCDateComponents;
+
+    /**
+     * Transform ecliptic/equatorial coordinates (3 values in, 3 out)
+     */
+    cotrans(xpo: number[], eps: number): number[];
+
+    /**
+     * Transform coordinates including speed (6 values in, 6 out)
+     */
+    cotrans_sp(xpo: number[], eps: number): number[];
+
+    /**
+     * Normalize an angle in radians to [0, 2π)
+     */
+    radnorm(angle: number): number;
+
+    /**
+     * Midpoint of two angles in radians
+     */
+    rad_midp(x1: number, x2: number): number;
+
+    /**
+     * Midpoint of two angles in degrees
+     */
+    deg_midp(x1: number, x2: number): number;
+
+    /**
+     * Normalize centiseconds to [0, 360°)
+     */
+    csnorm(p: number): number;
+
+    /**
+     * Round centiseconds to the nearest second
+     */
+    csroundsec(x: number): number;
+
+    /**
+     * Round a double to a long (centiseconds helper)
+     */
+    d2l(x: number): number;
+
+    /**
+     * Difference of two angles in centiseconds, normalized [0, 360°)
+     */
+    difcsn(p1: number, p2: number): number;
+
+    /**
+     * Difference of two angles in degrees, normalized [0, 360°)
+     */
+    difdegn(p1: number, p2: number): number;
+
+    /**
+     * Difference of two angles in centiseconds, normalized [-180°, 180°)
+     */
+    difcs2n(p1: number, p2: number): number;
+
+    /**
+     * Difference of two angles in degrees, normalized [-180°, 180°)
+     */
+    difdeg2n(p1: number, p2: number): number;
+
+    /**
+     * Difference of two angles in radians, normalized [-π, π)
+     */
+    difrad2n(p1: number, p2: number): number;
+
+    /**
+     * Format centiseconds as a time string
+     */
+    cs2timestr(t: number, sep: string, suppressZero: boolean): string;
+
+    /**
+     * Format centiseconds as a longitude/latitude string
+     */
+    cs2lonlatstr(t: number, pChar: string, mChar: string): string;
+
+    /**
+     * Format centiseconds as a degree string
+     */
+    cs2degstr(t: number): string;
 
     /**
      * Close Swiss Ephemeris and free memory
@@ -412,6 +584,27 @@ declare module 'swisseph-wasm' {
   export interface HousesResult {
     cusps: Float64Array;
     ascmc: Float64Array;
+  }
+
+  /**
+   * UTC calendar components (from jdet_to_utc / jdut1_to_utc / utc_time_zone)
+   */
+  export interface UTCDateComponents {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+  }
+
+  /**
+   * Orbit distance extremes returned by orbit_max_min_true_distance
+   */
+  export interface OrbitDistance {
+    maxDistance: number;
+    minDistance: number;
+    trueDistance: number;
   }
 
   /**
