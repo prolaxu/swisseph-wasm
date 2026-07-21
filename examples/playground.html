@@ -169,7 +169,8 @@ print('Sunrise (UT):', d.hour.toFixed(4) + 'h on ' + d.year + '-' + d.month + '-
     // The full Vedic birth chart lives in a text/plain block (no escaping needed).
     const VEDIC = (document.getElementById('ex-vedic') || {}).textContent || '';
     EXAMPLES['Full Vedic birth chart (sidereal)'] = VEDIC;
-    const DEFAULT_CODE = VEDIC;
+    // Open on the simple Birth chart (Sun / Moon / Asc) example.
+    const DEFAULT_CODE = EXAMPLES['Birth chart (Sun / Moon / Asc)'];
 
     const out = document.getElementById('output');
     const statusEl = document.getElementById('status');
@@ -227,7 +228,17 @@ print('Sunrise (UT):', d.hour.toFixed(4) + 'h on ' + d.year + '-' + d.month + '-
       });
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
       window.monaco = monaco; window.__editor = editor; // for testing/debugging
+      maybeAutoRun();
     });
+
+    // Run the default example once, as soon as both the editor and the WASM
+    // module are ready (order of readiness is not guaranteed).
+    let ranOnce = false;
+    function maybeAutoRun() {
+      if (ranOnce || !editor || !window.__swe) return;
+      ranOnce = true;
+      run();
+    }
 
     function run() {
       if (!window.__swe) return;
@@ -256,6 +267,7 @@ print('Sunrise (UT):', d.hour.toFixed(4) + 'h on ' + d.year + '-' + d.month + '-
       statusEl.textContent = 'ready · swe ' + e.detail;
       statusEl.className = 'text-xs px-2 py-1 rounded bg-emerald-700';
       runBtn.disabled = false;
+      maybeAutoRun();
     });
     window.addEventListener('swe-error', (e) => {
       statusEl.textContent = 'init failed';
