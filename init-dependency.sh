@@ -29,23 +29,34 @@ warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*"; }
 err()  { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; }
 
 # --- 1. Swiss Ephemeris C source (git submodule) ---------------------------
+# compile.sh only needs the root-level *.c / *.h. The upstream repo also
+# bundles hundreds of MB of ephemeris data (ephe/, doc/, ...), so a plain
+# submodule clone is very slow. We do a shallow + blobless + sparse clone that
+# pulls source files only.
 if [ -f .gitmodules ] && grep -q 'deps/swisseph' .gitmodules; then
-  info "Initializing Swiss Ephemeris source submodule (deps/swisseph)..."
-  # Shallow clone: the upstream repo bundles large ephemeris data, so a full
-  # history clone is slow. --depth 1 keeps the download minimal.
-  git submodule update --init --depth 1 deps/swisseph
+  SRC_URL="$(git config -f .gitmodules submodule.deps/swisseph.url)"
+
+  if [ ! -e deps/swisseph/.git ]; then
+    info "Cloning Swiss Ephemeris source (sparse: C sources only, skips data)..."
+    rm -rf deps/swisseph
+    git clone --depth 1 --filter=blob:none --sparse "$SRC_URL" deps/swisseph
+    # Non-cone patterns: root-level source files only, no subdirectories.
+    git -C deps/swisseph sparse-checkout set --no-cone '/*.c' '/*.h'
+  else
+    info "deps/swisseph already cloned; skipping."
+  fi
 
   if [ "${UPDATE:-0}" = "1" ]; then
-    info "UPDATE=1 -> advancing deps/swisseph to latest origin/master..."
-    git -C deps/swisseph fetch --depth 1 origin master
+    info "UPDATE=1 -> advancing deps/swisseph to latest origin master..."
+    git -C deps/swisseph fetch --depth 1 origin
     git -C deps/swisseph checkout --detach FETCH_HEAD
   fi
 else
   warn ".gitmodules has no deps/swisseph entry; skipping submodule step."
 fi
 
-if [ -f deps/swisseph/swephexp.h ]; then
-  ver="$(grep -E '#define[[:space:]]+SE_VERSION' deps/swisseph/swephexp.h \
+if [ -f deps/swisseph/sweph.h ]; then
+  ver="$(grep -E '#define[[:space:]]+SE_VERSION' deps/swisseph/sweph.h \
          | sed -E 's/.*"([^"]+)".*/\1/' | head -1 || true)"
   info "Swiss Ephemeris source present (version ${ver:-unknown})."
 else
