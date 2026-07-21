@@ -43,6 +43,10 @@ class SwissEph {
   // Backing store for the Emscripten module; populated by initSwissEph().
   #module;
 
+  // Last error string written by the C library (via its serr buffer). Set by
+  // methods that return null / { error } on failure; read via getLastError().
+  #lastError = '';
+
   // #region Constants
   SE_AUNIT_TO_KM = 149597870.7;
   SE_AUNIT_TO_LIGHTYEAR = 1.5812507409819728411242766893179e-5; // = 1.0 / 63241.07708427
@@ -331,6 +335,19 @@ class SwissEph {
     return this.#module;
   }
 
+  // The most recent error message from the C library, or '' if the last
+  // serr-returning call succeeded. Useful when a method returns null / { error }.
+  getLastError() {
+    return this.#lastError;
+  }
+
+  // Read the C serr buffer into #lastError and return it. Called by methods on
+  // their failure path before freeing the buffer.
+  #captureError(serrPtr) {
+    this.#lastError = serrPtr ? this.SweModule.UTF8ToString(serrPtr) : '';
+    return this.#lastError;
+  }
+
   // Allocate a heap buffer and copy a JS array of doubles into it. Returns the
   // pointer; caller is responsible for _free().
   #allocDoubles(values) {
@@ -468,6 +485,7 @@ class SwissEph {
       const error = this.SweModule.UTF8ToString(errorBuffer);
       this.SweModule._free(resultPtr);
       this.SweModule._free(errorBuffer);
+      this.#lastError = error;
       throw new Error(`Error in swe_calc_ut: ${error}`);
     }
 
@@ -802,6 +820,7 @@ class SwissEph {
       const error = this.SweModule.UTF8ToString(errorBuffer);
       this.SweModule._free(resultPtr);
       this.SweModule._free(errorBuffer);
+      this.#lastError = error;
       throw new Error(`Error in swe_calc: ${error}`);
     }
     const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
@@ -817,100 +836,70 @@ class SwissEph {
     };
   }
 
-  fixstar(star, julianDay, flags) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(star.length + 1);
-    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
+  // Shared implementation for swe_fixstar / swe_fixstar_ut / swe_fixstar2 /
+  // swe_fixstar2_ut. The star buffer is IN/OUT (the C library writes the full
+  // catalog name back) so it must be SE_MAX_STNAME (256) bytes.
+  #fixstarPos(fnName, star, julianDay, flags) {
+    const resultPtr = this.SweModule._malloc(6 * 8);
+    const starBuffer = this.SweModule._malloc(256);
+    this.SweModule.stringToUTF8(star, starBuffer, 256);
+    const serrPtr = this.SweModule._malloc(256);
     const retFlag = this.SweModule.ccall(
-      'swe_fixstar',
+      fnName,
       'number',
-      ['pointer', 'number', 'number', 'pointer'],
-      [starBuffer, julianDay, flags, resultPtr]
+      ['pointer', 'number', 'number', 'pointer', 'pointer'],
+      [starBuffer, julianDay, flags, resultPtr, serrPtr]
     );
     const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
+    if (retFlag < 0) this.#captureError(serrPtr); else this.#lastError = '';
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
+    this.SweModule._free(serrPtr);
     return retFlag < 0 ? null : results;
+  }
+
+  // Shared implementation for swe_fixstar_mag / swe_fixstar2_mag.
+  #fixstarMag(fnName, star) {
+    const magBuffer = this.SweModule._malloc(8);
+    const starBuffer = this.SweModule._malloc(256);
+    this.SweModule.stringToUTF8(star, starBuffer, 256);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
+      fnName,
+      'number',
+      ['pointer', 'pointer', 'pointer'],
+      [starBuffer, magBuffer, serrPtr]
+    );
+    const magnitude = this.SweModule.HEAPF64[magBuffer / 8];
+    if (retFlag < 0) this.#captureError(serrPtr); else this.#lastError = '';
+    this.SweModule._free(starBuffer);
+    this.SweModule._free(magBuffer);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : magnitude;
+  }
+
+  fixstar(star, julianDay, flags) {
+    return this.#fixstarPos('swe_fixstar', star, julianDay, flags);
   }
 
   fixstar_ut(star, julianDay, flags) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(star.length + 1);
-    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
-    const retFlag = this.SweModule.ccall(
-      'swe_fixstar_ut',
-      'number',
-      ['pointer', 'number', 'number', 'pointer'],
-      [starBuffer, julianDay, flags, resultPtr]
-    );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    return this.#fixstarPos('swe_fixstar_ut', star, julianDay, flags);
   }
 
   fixstar_mag(star) {
-    const magBuffer = this.SweModule._malloc(8);
-    const starBuffer = this.SweModule._malloc(star.length + 1);
-    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
-    const retFlag = this.SweModule.ccall(
-      'swe_fixstar_mag',
-      'number',
-      ['pointer', 'pointer'],
-      [starBuffer, magBuffer]
-    );
-    const magnitude = this.SweModule.HEAPF64[magBuffer / 8];
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(magBuffer);
-    return retFlag < 0 ? null : magnitude;
+    return this.#fixstarMag('swe_fixstar_mag', star);
   }
 
   fixstar2(star, julianDay, flags) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(star.length + 1);
-    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
-    const retFlag = this.SweModule.ccall(
-      'swe_fixstar2',
-      'number',
-      ['pointer', 'number', 'number', 'pointer'],
-      [starBuffer, julianDay, flags, resultPtr]
-    );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    return this.#fixstarPos('swe_fixstar2', star, julianDay, flags);
   }
 
   fixstar2_ut(star, julianDay, flags) {
-    const resultPtr = this.SweModule._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
-    const starBuffer = this.SweModule._malloc(star.length + 1);
-    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
-    const retFlag = this.SweModule.ccall(
-      'swe_fixstar2_ut',
-      'number',
-      ['pointer', 'number', 'number', 'pointer'],
-      [starBuffer, julianDay, flags, resultPtr]
-    );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    return this.#fixstarPos('swe_fixstar2_ut', star, julianDay, flags);
   }
 
   fixstar2_mag(star) {
-    const magBuffer = this.SweModule._malloc(8);
-    const starBuffer = this.SweModule._malloc(star.length + 1);
-    this.SweModule.stringToUTF8(star, starBuffer, star.length + 1);
-    const retFlag = this.SweModule.ccall(
-      'swe_fixstar2_mag',
-      'number',
-      ['pointer', 'pointer'],
-      [starBuffer, magBuffer]
-    );
-    const magnitude = this.SweModule.HEAPF64[magBuffer / 8];
-    this.SweModule._free(starBuffer);
-    this.SweModule._free(magBuffer);
-    return retFlag < 0 ? null : magnitude;
+    return this.#fixstarMag('swe_fixstar2_mag', star);
   }
 
   close() {
@@ -1039,9 +1028,11 @@ class SwissEph {
     };
 
     if (retFlag < 0) {
+      this.#captureError(serrPtr);
       freeAll();
       return { error: retFlag };
     }
+    this.#lastError = '';
 
     const buf = this.SweModule.HEAPF64.buffer;
     const ascending = new Float64Array(buf, xnascPtr, 6).slice();
@@ -1769,6 +1760,7 @@ class SwissEph {
       [planet, x2cross, julianDay, flags, direction, jdPtr, serrPtr]
     );
     const jd = this.SweModule.HEAPF64[jdPtr >> 3];
+    if (retFlag < 0) this.#captureError(serrPtr); else this.#lastError = '';
     this.SweModule._free(jdPtr);
     this.SweModule._free(serrPtr);
     return retFlag < 0 ? null : jd;

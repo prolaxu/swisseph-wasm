@@ -1,434 +1,207 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiss Ephemeris Playground</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Swiss Ephemeris WASM — Playground</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; }
+    #editor { min-height: 320px; }
+    .out-line { white-space: pre-wrap; word-break: break-word; }
+    .out-err { color: #f87171; }
+    .out-info { color: #93c5fd; }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <div id="app">
-        <!-- Header -->
-        <header class="bg-white border-b border-gray-200">
-            <div class="container mx-auto px-4 py-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-2xl font-bold text-gray-900">
-                            Swiss Ephemeris Playground
-                        </h1>
-                        <p class="text-gray-600 mt-1">Write and execute custom astronomical programs</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="flex gap-3 mb-2">
-                            <a href="api-explorer.html" class="text-sm text-blue-600 hover:text-blue-800">API Explorer</a>
-                            <a href="tests.html" class="text-sm text-blue-600 hover:text-blue-800">Tests</a>
-                        </div>
-                        <div class="text-sm" :class="status.color">{{ status.text }}</div>
-                        <div class="text-xs text-gray-400 mt-1">{{ version }}</div>
-                    </div>
-                </div>
-            </div>
-        </header>
+<body class="h-full bg-slate-900 text-slate-100">
+  <div class="flex flex-col h-full">
+    <!-- header -->
+    <header class="px-4 py-3 border-b border-slate-700 flex items-center gap-3 flex-wrap">
+      <h1 class="font-semibold text-lg">🪐 Swiss Ephemeris <span class="text-slate-400">Playground</span></h1>
+      <span id="status" class="text-xs px-2 py-1 rounded bg-slate-700">loading…</span>
+      <div class="ml-auto flex items-center gap-2">
+        <select id="examples" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm">
+          <option value="">Load example…</option>
+        </select>
+        <button id="run" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded px-4 py-1.5 text-sm font-medium" disabled>▶ Run <span class="opacity-60">(Ctrl+↵)</span></button>
+        <button id="clear" class="bg-slate-700 hover:bg-slate-600 rounded px-3 py-1.5 text-sm">Clear</button>
+      </div>
+    </header>
 
-        <div class="container mx-auto px-4 py-6">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- Left: Code Editor -->
-                <div class="space-y-4">
-                    <div class="bg-white rounded border border-gray-200 p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-semibold text-gray-900">Code Editor</h2>
-                            <button @click="runCode" 
-                                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-all font-medium text-sm">
-                                Run Code
-                            </button>
-                        </div>
-                        
-                        <textarea v-model="code" 
-                                  class="w-full h-[500px] bg-gray-50 border border-gray-300 rounded p-3 font-mono text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-none"
-                                  placeholder="Write your code here..."></textarea>
-                        
-                        <div class="mt-2 text-xs text-gray-500">
-                            Tip: Use <code class="bg-gray-100 px-2 py-0.5 rounded">swisseph</code> to access all methods
-                        </div>
-                    </div>
+    <!-- body: editor + output -->
+    <main class="flex-1 grid md:grid-cols-2 grid-rows-2 md:grid-rows-1 min-h-0">
+      <div id="editor" class="border-r border-slate-700"></div>
+      <div class="flex flex-col min-h-0">
+        <div class="px-3 py-1.5 text-xs uppercase tracking-wide text-slate-400 border-b border-slate-700">Output</div>
+        <div id="output" class="flex-1 overflow-auto p-3 font-mono text-sm leading-relaxed"></div>
+      </div>
+    </main>
+    <footer class="px-4 py-1.5 text-xs text-slate-500 border-t border-slate-700">
+      Tip: type <code class="text-slate-300">swisseph.</code> for autocomplete on the full API. <code class="text-slate-300">print(...)</code> writes to the Output panel.
+    </footer>
+  </div>
 
-                    <!-- Quick Reference -->
-                    <div class="bg-white rounded border border-gray-200 p-3">
-                        <h3 class="text-sm font-semibold text-gray-900 mb-2">Quick Reference</h3>
-                        <div class="space-y-1 text-xs">
-                            <div><code class="text-blue-600">swisseph.julday(2000, 1, 1, 12.0)</code> - Convert date to JD</div>
-                            <div><code class="text-blue-600">swisseph.calc(jd, swisseph.SE_SUN, ...)</code> - Planet position</div>
-                            <div><code class="text-blue-600">swisseph.houses(jd, lat, lon, 'P')</code> - House cusps</div>
-                        </div>
-                    </div>
-                </div>
+  <!-- Load the WASM module (ES module) and expose it globally for the editor runtime. -->
+  <script type="module">
+    import SwissEph from '../src/swisseph.js';
+    (async () => {
+      try {
+        const swe = new SwissEph();
+        await swe.initSwissEph();
+        window.__swe = swe;
+        window.dispatchEvent(new CustomEvent('swe-ready', { detail: swe.version() }));
+      } catch (e) {
+        window.dispatchEvent(new CustomEvent('swe-error', { detail: String(e && e.message || e) }));
+      }
+    })();
+  </script>
 
-                <!-- Right: Templates + Output + Saved -->
-                <div class="space-y-4">
-                    <!-- Program Templates - Compact Batch -->
-                    <div class="bg-white rounded border border-gray-200 p-3">
-                        <h2 class="text-sm font-semibold text-gray-900 mb-2">Program Templates</h2>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button v-for="template in templates" :key="template.name"
-                                    @click="loadTemplate(template)"
-                                    class="p-2 bg-gray-50 rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-center">
-                                <div class="font-medium text-gray-900 text-xs">{{ template.name }}</div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Output -->
-                    <div class="bg-white rounded border border-gray-200 p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-semibold text-gray-900">Output</h2>
-                            <button @click="clearOutput" 
-                                    class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-all text-sm">
-                                Clear
-                            </button>
-                        </div>
-                        
-                        <div class="bg-gray-50 rounded border border-gray-200 p-3 h-80 overflow-y-auto font-mono text-sm">
-                            <div v-if="output.length === 0" class="text-gray-400 italic">
-                                No output yet. Run some code to see results.
-                            </div>
-                            <div v-for="(item, idx) in output" :key="idx" class="mb-2">
-                                <div v-if="item.type === 'log'" class="text-blue-600">
-                                    <span class="text-gray-400">›</span> {{ item.value }}
-                                </div>
-                                <div v-else-if="item.type === 'result'" class="text-green-600">
-                                    <span class="text-gray-400">→</span> {{ item.value }}
-                                </div>
-                                <div v-else-if="item.type === 'error'" class="text-red-600">
-                                    <span class="text-gray-400">✗</span> {{ item.value }}
-                                </div>
-                                <div v-else-if="item.type === 'object'" class="text-gray-700">
-                                    <pre class="whitespace-pre-wrap">{{ item.value }}</pre>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Saved Programs -->
-                    <div class="bg-white rounded border border-gray-200 p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h2 class="text-sm font-semibold text-gray-900">Saved Programs</h2>
-                            <button @click="saveProgram" 
-                                    class="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all text-xs">
-                                + Save
-                            </button>
-                        </div>
-                        
-                        <div v-if="savedPrograms.length === 0" class="text-gray-400 text-xs italic">
-                            No saved programs yet
-                        </div>
-                        <div v-else class="space-y-2 max-h-40 overflow-y-auto">
-                            <div v-for="(program, idx) in savedPrograms" :key="idx"
-                                 class="bg-gray-50 rounded border border-gray-200 p-2 hover:bg-gray-100 transition-all">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex-1 min-w-0">
-                                        <div class="font-medium text-gray-900 text-xs truncate">{{ program.name }}</div>
-                                        <div class="text-xs text-gray-500">{{ program.date }}</div>
-                                    </div>
-                                    <div class="flex gap-1 ml-2">
-                                        <button @click="loadSavedProgram(program)" 
-                                                class="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs">
-                                            Load
-                                        </button>
-                                        <button @click="deleteSavedProgram(idx)" 
-                                                class="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs">
-                                            Del
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script type="module">
-        import SwissEph from '../src/swisseph.js';
-
-        const { createApp } = Vue;
-
-        createApp({
-            data() {
-                return {
-                    swisseph: null,
-                    status: { text: 'Loading...', color: 'text-yellow-600' },
-                    version: '',
-                    code: '',
-                    output: [],
-                    savedPrograms: [],
-                    templates: [
-                        {
-                            name: 'Birth Chart',
-                            description: 'Calculate natal chart positions',
-                            code: `// Birth Chart Calculator
-const birthDate = { year: 1990, month: 6, day: 15, hour: 14.5 };
-const birthPlace = { lat: 40.7128, lon: -74.0060 }; // New York
-
-// Convert to Julian Day
-const jd = swisseph.julday(birthDate.year, birthDate.month, birthDate.day, birthDate.hour);
-console.log('Julian Day:', jd);
-
-// Calculate Sun position
-const sun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH);
-console.log('Sun:', sun.longitude.toFixed(2) + '°');
-
-// Calculate Moon position
-const moon = swisseph.calc(jd, swisseph.SE_MOON, swisseph.SEFLG_SWIEPH);
-console.log('Moon:', moon.longitude.toFixed(2) + '°');
-
-// Calculate Ascendant
-const houses = swisseph.houses(jd, birthPlace.lat, birthPlace.lon, 'P');
-console.log('Ascendant:', houses.ascmc[0].toFixed(2) + '°');
-
-return {
-    sun: sun.longitude,
-    moon: moon.longitude,
-    ascendant: houses.ascmc[0]
-};`
-                        },
-                        {
-                            name: 'Planet Positions',
-                            description: 'Get all planet positions',
-                            code: `// All Planet Positions
-const jd = swisseph.julday(2024, 1, 1, 12.0);
-
-const planets = [
-    { id: swisseph.SE_SUN, name: 'Sun' },
-    { id: swisseph.SE_MOON, name: 'Moon' },
-    { id: swisseph.SE_MERCURY, name: 'Mercury' },
-    { id: swisseph.SE_VENUS, name: 'Venus' },
-    { id: swisseph.SE_MARS, name: 'Mars' },
-    { id: swisseph.SE_JUPITER, name: 'Jupiter' },
-    { id: swisseph.SE_SATURN, name: 'Saturn' }
-];
-
-const positions = {};
-
-planets.forEach(planet => {
-    const pos = swisseph.calc(jd, planet.id, swisseph.SEFLG_SWIEPH);
-    positions[planet.name] = pos.longitude.toFixed(2) + '°';
-    console.log(planet.name + ':', positions[planet.name]);
-});
-
-return positions;`
-                        },
-                        {
-                            name: 'House System',
-                            description: 'Calculate house cusps',
-                            code: `// House System Calculator
-const jd = swisseph.julday(2024, 1, 1, 12.0);
-const lat = 51.5074; // London
-const lon = -0.1278;
-
-// Calculate houses (Placidus)
-const houses = swisseph.houses(jd, lat, lon, 'P');
-
-console.log('House Cusps (Placidus):');
-for (let i = 1; i <= 12; i++) {
-    console.log('House ' + i + ':', houses.cusps[i].toFixed(2) + '°');
+  <!-- Monaco editor (AMD loader from CDN). -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <script>
+    const EXAMPLES = {
+      'Birth chart (Sun / Moon / Asc)': `const jd = swisseph.julday(1990, 6, 15, 13.5);
+const flags = swisseph.SEFLG_SWIEPH | swisseph.SEFLG_SPEED;
+for (const p of [swisseph.SE_SUN, swisseph.SE_MOON, swisseph.SE_MERCURY, swisseph.SE_VENUS, swisseph.SE_MARS]) {
+  const pos = swisseph.calc(jd, p, flags);
+  print(swisseph.get_planet_name(p).padEnd(9), pos.longitude.toFixed(4) + '\\u00b0', 'speed', pos.longitudeSpeed.toFixed(4));
 }
+const h = swisseph.houses(jd, 40.7128, -74.0060, 'P');
+print('Ascendant', h.ascmc[0].toFixed(4) + '\\u00b0', '| MC', h.ascmc[1].toFixed(4) + '\\u00b0');`,
 
-console.log('\\nAngles:');
-console.log('Ascendant:', houses.ascmc[0].toFixed(2) + '°');
-console.log('MC:', houses.ascmc[1].toFixed(2) + '°');
+      'House cusps (Placidus)': `const jd = swisseph.julday(2000, 1, 1, 12);
+const h = swisseph.houses(jd, 47.0, 8.0, 'P');
+print('System:', swisseph.house_name('P'));
+for (let i = 1; i <= 12; i++) print('House ' + i, h.cusps[i].toFixed(3) + '\\u00b0');`,
 
-return {
-    cusps: houses.cusps.slice(1, 13),
-    ascendant: houses.ascmc[0],
-    mc: houses.ascmc[1]
-};`
-                        },
-                        {
-                            name: 'Sidereal Time',
-                            description: 'Calculate sidereal time',
-                            code: `// Sidereal Time Calculator
-const now = new Date();
-const jd = swisseph.julday(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    now.getDate(),
-    now.getHours() + now.getMinutes() / 60
-);
+      'Next solar eclipse': `const jd = swisseph.julday(2000, 1, 1, 0);
+const e = swisseph.sol_eclipse_when_glob(jd, swisseph.SEFLG_SWIEPH, 0, 0);
+const d = swisseph.revjul(e.tret[0], swisseph.SE_GREG_CAL);
+const type = e.retFlag & swisseph.SE_ECL_TOTAL ? 'Total'
+           : e.retFlag & swisseph.SE_ECL_ANNULAR ? 'Annular' : 'Partial';
+print('Next solar eclipse:', d.year + '-' + d.month + '-' + d.day, '(' + type + ')');
+const w = swisseph.sol_eclipse_where(e.tret[0], swisseph.SEFLG_SWIEPH);
+print('Greatest at lon/lat:', w.geopos[0].toFixed(2), w.geopos[1].toFixed(2));`,
 
-const sidtime = swisseph.sidtime(jd);
-const hours = Math.floor(sidtime);
-const minutes = Math.floor((sidtime - hours) * 60);
-const seconds = Math.floor(((sidtime - hours) * 60 - minutes) * 60);
+      'Fixed star + error handling': `const s = swisseph.fixstar('Aldebaran', swisseph.julday(2000,1,1,12), swisseph.SEFLG_SWIEPH);
+print('Aldebaran longitude:', s ? s[0].toFixed(4) + '\\u00b0' : 'error: ' + swisseph.getLastError());
+const bad = swisseph.fixstar('Nope', 2451545, swisseph.SEFLG_SWIEPH);
+print('Bad star:', bad, '| getLastError():', swisseph.getLastError());`,
 
-console.log('Current Date:', now.toLocaleDateString());
-console.log('Julian Day:', jd.toFixed(4));
-console.log('Sidereal Time:', hours + 'h ' + minutes + 'm ' + seconds + 's');
-
-return {
-    julianDay: jd,
-    siderealTime: sidtime,
-    formatted: hours + ':' + minutes + ':' + seconds
-};`
-                        },
-                        {
-                            name: 'Ayanamsa',
-                            description: 'Calculate ayanamsa values',
-                            code: `// Ayanamsa Calculator
-const jd = swisseph.julday(2024, 1, 1, 0.0);
-
-// Set Lahiri ayanamsa
+      'Sidereal (Lahiri ayanamsa)': `const jd = swisseph.julday(2000, 1, 1, 12);
 swisseph.set_sid_mode(swisseph.SE_SIDM_LAHIRI, 0, 0);
+print('Ayanamsa:', swisseph.get_ayanamsa(jd).toFixed(6) + '\\u00b0', '(' + swisseph.get_ayanamsa_name(swisseph.SE_SIDM_LAHIRI) + ')');
+const sun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH | swisseph.SEFLG_SIDEREAL);
+print('Sidereal Sun:', sun.longitude.toFixed(4) + '\\u00b0');`,
 
-const ayanamsa = swisseph.get_ayanamsa(jd);
-const name = swisseph.get_ayanamsa_name(swisseph.SE_SIDM_LAHIRI);
+      'Sunrise (rise_trans)': `const jd = swisseph.julday(2024, 6, 21, 0);
+const tret = swisseph.rise_trans(jd, swisseph.SE_SUN, '', swisseph.SEFLG_SWIEPH, swisseph.SE_CALC_RISE, [8.0, 47.0, 400.0], 1013.25, 15.0);
+const d = swisseph.revjul(tret[0], swisseph.SE_GREG_CAL);
+print('Sunrise (UT):', d.hour.toFixed(4) + 'h on ' + d.year + '-' + d.month + '-' + d.day);`,
+    };
 
-console.log('Ayanamsa System:', name);
-console.log('Ayanamsa Value:', ayanamsa.toFixed(6) + '°');
+    const DEFAULT_CODE = `// The API is ready as \`swisseph\`. Type "swisseph." for autocomplete.
+const jd = swisseph.julday(2000, 1, 1, 12);
+print('Julian Day:', jd);
 
-// Calculate tropical vs sidereal Sun
-const tropicalSun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH);
-const siderealSun = tropicalSun.longitude - ayanamsa;
+const sun = swisseph.calc(jd, swisseph.SE_SUN, swisseph.SEFLG_SWIEPH);
+print('Sun longitude:', sun.longitude.toFixed(4) + '\\u00b0');
 
-console.log('\\nSun Position:');
-console.log('Tropical:', tropicalSun.longitude.toFixed(2) + '°');
-console.log('Sidereal:', siderealSun.toFixed(2) + '°');
+const h = swisseph.houses(jd, 47.0, 8.0, 'P');
+print('Ascendant:', h.ascmc[0].toFixed(4) + '\\u00b0');
+`;
 
-return {
-    ayanamsa: ayanamsa,
-    tropical: tropicalSun.longitude,
-    sidereal: siderealSun
-};`
-                        },
-                        {
-                            name: 'Date Conversion',
-                            description: 'Convert between date formats',
-                            code: `// Date Conversion Examples
-const date = { year: 2024, month: 6, day: 21, hour: 12.0 };
+    const out = document.getElementById('output');
+    const statusEl = document.getElementById('status');
+    const runBtn = document.getElementById('run');
 
-// Convert to Julian Day
-const jd = swisseph.julday(date.year, date.month, date.day, date.hour);
-console.log('Julian Day:', jd);
+    function write(cls, parts) {
+      const line = document.createElement('div');
+      line.className = 'out-line ' + (cls || '');
+      line.textContent = parts.map(fmt).join(' ');
+      out.appendChild(line);
+      out.scrollTop = out.scrollHeight;
+    }
+    function fmt(v) {
+      if (v instanceof Float64Array) return '[' + Array.from(v).map(n => +n.toFixed(6)).join(', ') + ']';
+      if (typeof v === 'object' && v !== null) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+      return String(v);
+    }
+    const api = {
+      print: (...a) => write('', a),
+      console: { log: (...a) => write('', a), error: (...a) => write('out-err', a), warn: (...a) => write('out-info', a) },
+    };
 
-// Convert back to calendar
-const revDate = swisseph.revjul(jd, 1);
-console.log('Reverse:', revDate.year + '-' + revDate.month + '-' + revDate.day + ' ' + revDate.hour + 'h');
+    let editor;
+    const MONACO_BASE = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/';
+    // Language workers must load cross-origin; wrap them in a same-origin data-URL
+    // shim so completions/diagnostics work from the CDN.
+    window.MonacoEnvironment = {
+      getWorkerUrl: () => 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+        `self.MonacoEnvironment = { baseUrl: '${MONACO_BASE}' };\n` +
+        `importScripts('${MONACO_BASE}vs/base/worker/workerMain.js');`
+      ),
+    };
+    require.config({ paths: { vs: MONACO_BASE + 'vs' } });
+    require(['vs/editor/editor.main'], async () => {
+      // Feed Monaco our real type definitions so `swisseph.` autocompletes.
+      try {
+        let dts = await (await fetch('../types/index.d.ts')).text();
+        dts = dts.replace(/declare module 'swisseph-wasm'\s*\{/, '')  // drop module wrapper
+                 .replace(/\}\s*$/, '')                                // and its closing brace
+                 .replace(/export default /g, '')
+                 .replace(/export /g, '');
+        dts += `\ndeclare const swisseph: SwissEph;\ndeclare function print(...args: any[]): void;\n`;
+        monaco.languages.typescript.javascriptDefaults.addExtraLib(dts, 'ts:swisseph.d.ts');
+        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false });
+      } catch (e) { /* autocomplete is best-effort */ }
 
-// Calculate day of week
-const dow = swisseph.day_of_week(jd);
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-console.log('Day of Week:', days[dow]);
+      editor = monaco.editor.create(document.getElementById('editor'), {
+        value: DEFAULT_CODE,
+        language: 'javascript',
+        theme: 'vs-dark',
+        automaticLayout: true,
+        minimap: { enabled: false },
+        fontSize: 14,
+        scrollBeyondLastLine: false,
+      });
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
+      window.monaco = monaco; window.__editor = editor; // for testing/debugging
+    });
 
-// Delta T
-const deltaT = swisseph.deltat(jd);
-console.log('Delta T:', (deltaT * 86400).toFixed(2) + ' seconds');
+    function run() {
+      if (!window.__swe) return;
+      out.innerHTML = '';
+      const code = editor.getValue();
+      try {
+        const fn = new Function('swisseph', 'print', 'console', `return (async () => {\n${code}\n})();`);
+        Promise.resolve(fn(window.__swe, api.print, api.console))
+          .catch(err => write('out-err', ['Error:', err && err.message || err]));
+      } catch (err) {
+        write('out-err', ['Error:', err && err.message || err]);
+      }
+    }
 
-return {
-    julianDay: jd,
-    dayOfWeek: days[dow],
-    deltaT: deltaT
-};`
-                        }
-                    ]
-                };
-            },
-            async mounted() {
-                await this.init();
-                this.loadSavedPrograms();
-            },
-            methods: {
-                async init() {
-                    try {
-                        this.status = { text: 'Initializing...', color: 'text-yellow-600' };
-                        this.swisseph = new SwissEph();
-                        await this.swisseph.initSwissEph();
-                        
-                        this.version = 'Swiss Ephemeris v' + this.swisseph.version();
-                        this.status = { text: 'Ready', color: 'text-green-600' };
-                        
-                        // Load first template by default
-                        this.loadTemplate(this.templates[0]);
-                    } catch (error) {
-                        this.status = { text: 'Error: ' + error.message, color: 'text-red-600' };
-                    }
-                },
-                loadTemplate(template) {
-                    this.code = template.code;
-                    this.output = [];
-                },
-                runCode() {
-                    this.output = [];
-                    
-                    // Create a custom console
-                    const customConsole = {
-                        log: (...args) => {
-                            args.forEach(arg => {
-                                if (typeof arg === 'object') {
-                                    this.output.push({ 
-                                        type: 'object', 
-                                        value: JSON.stringify(arg, null, 2) 
-                                    });
-                                } else {
-                                    this.output.push({ type: 'log', value: String(arg) });
-                                }
-                            });
-                        }
-                    };
-                    
-                    try {
-                        // Create function with swisseph and console in scope
-                        const func = new Function('swisseph', 'console', this.code);
-                        const result = func(this.swisseph, customConsole);
-                        
-                        if (result !== undefined) {
-                            if (typeof result === 'object') {
-                                this.output.push({ 
-                                    type: 'object', 
-                                    value: JSON.stringify(result, null, 2) 
-                                });
-                            } else {
-                                this.output.push({ type: 'result', value: String(result) });
-                            }
-                        }
-                    } catch (error) {
-                        this.output.push({ type: 'error', value: error.message });
-                    }
-                },
-                clearOutput() {
-                    this.output = [];
-                },
-                saveProgram() {
-                    const name = prompt('Enter a name for this program:');
-                    if (!name) return;
-                    
-                    const program = {
-                        name: name,
-                        code: this.code,
-                        date: new Date().toLocaleString()
-                    };
-                    
-                    this.savedPrograms.push(program);
-                    localStorage.setItem('swisseph_programs', JSON.stringify(this.savedPrograms));
-                },
-                loadSavedProgram(program) {
-                    this.code = program.code;
-                    this.output = [];
-                },
-                deleteSavedProgram(idx) {
-                    if (confirm('Delete this program?')) {
-                        this.savedPrograms.splice(idx, 1);
-                        localStorage.setItem('swisseph_programs', JSON.stringify(this.savedPrograms));
-                    }
-                },
-                loadSavedPrograms() {
-                    const saved = localStorage.getItem('swisseph_programs');
-                    if (saved) {
-                        this.savedPrograms = JSON.parse(saved);
-                    }
-                }
-            }
-        }).mount('#app');
-    </script>
+    document.getElementById('run').addEventListener('click', run);
+    document.getElementById('clear').addEventListener('click', () => { out.innerHTML = ''; });
+
+    const sel = document.getElementById('examples');
+    for (const name of Object.keys(EXAMPLES)) {
+      const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => { if (sel.value && editor) { editor.setValue(EXAMPLES[sel.value]); sel.value = ''; } });
+
+    // Enable Run once the WASM module is ready.
+    window.addEventListener('swe-ready', (e) => {
+      statusEl.textContent = 'ready · swe ' + e.detail;
+      statusEl.className = 'text-xs px-2 py-1 rounded bg-emerald-700';
+      runBtn.disabled = false;
+    });
+    window.addEventListener('swe-error', (e) => {
+      statusEl.textContent = 'init failed';
+      statusEl.className = 'text-xs px-2 py-1 rounded bg-red-700';
+      write('out-err', ['Failed to init SwissEph:', e.detail]);
+    });
+  </script>
 </body>
 </html>

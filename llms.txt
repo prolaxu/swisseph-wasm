@@ -1,0 +1,110 @@
+# swisseph-wasm
+
+> High-precision astronomical/astrological calculations for JavaScript. The
+> Swiss Ephemeris C library (v2.10.03) compiled to WebAssembly, with a
+> hand-written wrapper class and complete TypeScript types. Works in Node and
+> the browser. License: GPL-3.0-or-later (Swiss Ephemeris is dual-licensed;
+> commercial use may require a license from Astrodienst AG).
+
+## Critical usage rules (read before generating code)
+
+- **Always `await` initialization before any call.** Every method throws
+  `SwissEph not initialized. Call await initSwissEph() first.` until init runs.
+  ```js
+  import SwissEph from 'swisseph-wasm';
+  const swe = new SwissEph();
+  await swe.initSwissEph();
+  ```
+- **ESM only** (`"type": "module"`). Default export is the `SwissEph` class.
+- **Constants are instance properties** (`swe.SE_SUN`, `swe.SEFLG_SWIEPH`, …),
+  available only after `new SwissEph()`. There is no static/enum export.
+- **WebAssembly, not the native lib.** Host OS paths do NOT work with
+  `set_ephe_path()`. Ephemeris files are bundled in `wasm/swisseph.data` and
+  mounted at `/sweph`; `initSwissEph()` points the engine there automatically.
+  No `set_ephe_path()` call is needed. Bundled date coverage ≈ 1800–2400 AD.
+- **House system** is a single-letter string (`'P'` Placidus, `'K'` Koch,
+  `'W'` whole-sign, …), passed as-is.
+- **Angles are degrees** unless the `SEFLG_RADIANS` flag is set.
+- **`jd`** is a Julian Day number. Use `julday(year, month, day, hourDecimal)`.
+
+## Error handling
+
+- `calc` / `calc_ut` **throw** on error (message included).
+- Most other fallible methods **return `null`** (or `{ error }` for
+  `nod_aps`). After a null/`{error}`, call **`swe.getLastError()`** for the C
+  library's message (populated by `calc*`, `fixstar*`, `nod_aps*`,
+  `helio_cross*`; other methods may return `null` with an empty message).
+
+## Return shapes (commonly mis-remembered)
+
+- `houses(jd, lat, lon, hsys)` → `{ cusps: Float64Array(13), ascmc: Float64Array(10) }`.
+  Cusps are `cusps[1]..cusps[12]` (index 0 unused). `ascmc[0]`=Ascendant, `[1]`=MC.
+- `calc(jd, ipl, flags)` → `{ longitude, latitude, distance, longitudeSpeed, latitudeSpeed, distanceSpeed }`.
+- `calc_ut(...)` → `Float64Array(6)` `[lon, lat, dist, lonSpeed, latSpeed, distSpeed]`.
+- `nod_aps(...)` → `{ ascending, descending, perihelion, aphelion, asc_node, desc_node, peri_lon, aphe_lon }` or `{ error }`.
+- `refrac(inalt, atpress, attemp, calcFlag)` → number (converted altitude).
+- Eclipses/occultations: `*_where` → `{ retFlag, geopos, attr }`; `*_how` →
+  `{ retFlag, attr }`; `*_when` / `*_when_glob` → `{ retFlag, tret }`;
+  `*_when_loc` → `{ retFlag, tret, attr }`. `retFlag` carries `SE_ECL_*` bits;
+  `tret[0]` is the event time.
+- `rise_trans(jd, ipl, starname, epheFlag, rsmi, geopos[lon,lat,alt], atpress, attemp)`
+  → `Float64Array` (event time in `[0]`) or null. `rsmi` = `SE_CALC_RISE` / `SE_CALC_SET` / `SE_CALC_MTRANSIT` / `SE_CALC_ITRANSIT`.
+
+## Minimal example
+
+```js
+import SwissEph from 'swisseph-wasm';
+const swe = new SwissEph();
+await swe.initSwissEph();
+
+const jd = swe.julday(2000, 1, 1, 12);            // 2451545
+const sun = swe.calc(jd, swe.SE_SUN, swe.SEFLG_SWIEPH);
+console.log(sun.longitude);                        // 280.368...
+
+const h = swe.houses(jd, 47.0, 8.0, 'P');
+console.log(h.ascmc[0]);                           // Ascendant, degrees
+
+swe.close();
+```
+
+## API surface (104 methods)
+
+- **Time**: `julday`, `date_conversion`, `revjul`, `utc_to_jd`, `jdet_to_utc`,
+  `jdut1_to_utc`, `utc_time_zone`, `deltat`, `deltat_ex`, `time_equ`,
+  `sidtime`, `sidtime0`, `day_of_week`, `lat_to_lmt`, `lmt_to_lat`.
+- **Positions**: `calc`, `calc_ut`, `calc_pctr`, `get_planet_name`,
+  `nod_aps`, `nod_aps_ut`, `get_orbital_elements`,
+  `orbit_max_min_true_distance`, `pheno`, `pheno_ut`.
+- **Fixed stars**: `fixstar`, `fixstar_ut`, `fixstar_mag`, `fixstar2`,
+  `fixstar2_ut`, `fixstar2_mag`.
+- **Houses**: `houses`, `houses_ex`, `houses_ex2`, `houses_armc`,
+  `houses_armc_ex2`, `house_pos`, `house_name`.
+- **Eclipses / occultations**: `sol_eclipse_where`, `sol_eclipse_how`,
+  `sol_eclipse_when_loc`, `sol_eclipse_when_glob`, `lun_eclipse_how`,
+  `lun_eclipse_when`, `lun_eclipse_when_loc`, `lun_occult_where`,
+  `lun_occult_when_loc`, `lun_occult_when_glob`.
+- **Rise/set & horizon**: `rise_trans`, `rise_trans_true_hor`, `azalt`,
+  `azalt_rev`, `refrac`, `refrac_extended`, `set_lapse_rate`.
+- **Crossings**: `solcross`, `solcross_ut`, `mooncross`, `mooncross_ut`,
+  `mooncross_node`, `mooncross_node_ut`, `helio_cross`, `helio_cross_ut`.
+- **Sidereal / ayanamsa**: `set_sid_mode`, `get_ayanamsa`, `get_ayanamsa_ut`,
+  `get_ayanamsa_ex`, `get_ayanamsa_ex_ut`, `get_ayanamsa_name`.
+- **Heliacal**: `heliacal_ut`, `heliacal_pheno_ut`, `vis_limit_mag`,
+  `gauquelin_sector`.
+- **Coordinate/angle math**: `cotrans`, `cotrans_sp`, `degnorm`, `radnorm`,
+  `rad_midp`, `deg_midp`, `split_deg`, `csnorm`, `csroundsec`, `d2l`,
+  `difcsn`, `difdegn`, `difcs2n`, `difdeg2n`, `difrad2n`.
+- **Formatting**: `cs2timestr`, `cs2lonlatstr`, `cs2degstr`.
+- **Config / misc**: `set_ephe_path`, `set_jpl_file`, `set_topo`,
+  `set_tid_acc`, `get_tid_acc`, `set_delta_t_userdef`, `set_interpolate_nut`,
+  `get_astro_models`, `set_astro_models`, `get_library_path`,
+  `get_current_file_data`, `version`, `getLastError`, `close`.
+
+## Docs
+
+- [README](README.md) — install, cross-platform setup, examples, ephemeris paths, building from source
+- [types/index.d.ts](types/index.d.ts) — complete TypeScript definitions (source of truth for signatures)
+- [DOCUMENTATION.md](DOCUMENTATION.md) — extended guide
+- [CHANGELOG.md](CHANGELOG.md) — release notes (v0.1.0 changed several return shapes)
+- [examples/playground.html](examples/playground.html) — interactive editor with autocomplete
+- Verification: `npm test` (Node assertions) and `npm run verify` (diff every method against the native C library)

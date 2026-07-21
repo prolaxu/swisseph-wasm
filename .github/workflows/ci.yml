@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Run the Node test suite + TypeScript type-check across Node versions.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+      - name: Test suite
+        run: npm test
+      - name: Type-check (tsc --strict)
+        run: npx -y -p typescript tsc --noEmit --strict types/index.d.ts
+
+  # Compile the vendored C library natively and diff every wrapped method
+  # against it. Proves the WASM wrappers' argument marshaling is correct.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Ensure gcc
+        run: gcc --version
+      - name: JS-vs-C verification
+        run: npm run verify
+
+  # Rebuild wasm/ from source with the Emscripten toolchain, then run the full
+  # suite against the freshly built binary. This makes the committed wasm/
+  # reproducible from source instead of merely trusted.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+      - name: Rebuild wasm from vendored source
+        run: bash compile.sh
+      - name: Report any drift vs committed wasm (informational)
+        run: git --no-pager diff --stat -- wasm/ || true
+      - name: Tests against freshly built wasm
+        run: npm test
+      - name: JS-vs-C verification against freshly built wasm
+        run: npm run verify

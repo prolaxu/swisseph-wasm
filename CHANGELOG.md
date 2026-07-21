@@ -42,6 +42,9 @@ corrupted memory; fixing them changed their signatures and/or return shapes:
   string instead of a char code.
 - Methods called before `initSwissEph()` now throw a clear error instead of a
   cryptic "Cannot read properties of undefined".
+- `fixstar*` now use a full-size (256-byte) star buffer — the C library writes
+  the resolved catalog name back into it, which could overflow the previous
+  `name.length + 1` allocation.
 
 ### Added
 
@@ -53,8 +56,15 @@ corrupted memory; fixing them changed their signatures and/or return shapes:
   `set_astro_models`.
 - Complete TypeScript definitions: all 104 wrapped methods are typed
   (`tsc --strict` clean).
-- JS-vs-C verification harness (`npm run verify`) and an in-browser harness
-  (`verification/browser_test.html`).
+- **`getLastError()`** — returns the C library's error message after a call
+  that returned `null` / `{ error }` (wired into `calc*`, `fixstar*`,
+  `nod_aps*`, `helio_cross*`).
+- JS-vs-C verification harness (`npm run verify`), an in-browser harness
+  (`verification/browser_test.html`), and a GitHub Actions CI workflow that
+  runs the tests, type-check, verification, and a from-source WASM rebuild.
+- Interactive **playground** (`examples/playground.html`) with a Monaco code
+  editor and autocomplete driven by the package's own type definitions.
+- `llms.txt` — a concise, LLM-oriented API reference.
 
 ### Changed
 

@@ -628,6 +628,13 @@ declare module 'swisseph-wasm' {
     set_astro_models(models: string, flags: number): void;
 
     /**
+     * The most recent error message from the underlying C library, or '' if the
+     * last call succeeded. Populated by methods that return null / { error } on
+     * failure (calc, calc_ut, fixstar*, nod_aps, helio_cross*).
+     */
+    getLastError(): string;
+
+    /**
      * Close Swiss Ephemeris and free memory
      */
     close(): void;
