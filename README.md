@@ -368,6 +368,46 @@ module.exports = {
 - Atmospheric refraction
 - Coordinate transformations
 
+## 📂 Ephemeris Files & Paths
+
+This library runs the Swiss Ephemeris **inside WebAssembly**, so ephemeris files are handled differently than the native C library.
+
+### Host OS paths do NOT work
+
+Because everything runs in the Emscripten virtual filesystem, host operating-system paths are **not** valid arguments to `set_ephe_path()`. Passing something like `/home/user/ephe` or `C:\sweph` will not find any files — that directory does not exist inside the WASM sandbox.
+
+### Bundled ephemeris files
+
+The required ephemeris files are bundled into `wasm/swisseph.data` and mounted in the Emscripten virtual filesystem at `/sweph`. `initSwissEph()` already points the engine at this directory, so **no `set_ephe_path()` call is needed for normal use**.
+
+The bundled files are:
+
+| File | Contents |
+| --- | --- |
+| `sepl_18.se1` | Main planets |
+| `semo_18.se1` | Moon |
+| `seas_18.se1` | Main asteroids (Ceres, Pallas, Juno, Vesta, Chiron, Pholus) |
+| `sefstars.txt` | Fixed star catalog |
+| `seorbel.txt` | Orbital elements for fictitious bodies |
+| `seleapsec.txt` | Leap-second table |
+
+**Date coverage** of the bundled `.se1` files is approximately **1800–2400 AD**. That range covers the vast majority of astrological and astronomical use cases without any extra configuration.
+
+### Rebuilding with additional `.se1` files
+
+To support dates outside ~1800–2400 AD (or to add more asteroids), rebuild the WASM data bundle with additional ephemeris files:
+
+1. Download the `.se1` files you need from the official archive:
+   <https://www.astro.com/ftp/swisseph/ephe/>
+2. Place them in `deps/sweph/` in this repository.
+3. Run the build script:
+
+   ```bash
+   ./compile.sh
+   ```
+
+   The script preloads that directory into the virtual filesystem via Emscripten's `--preload-file ./deps/sweph@/sweph`, so any files you add appear under `/sweph` at runtime — exactly where the engine already looks.
+
 ## 🧪 Testing
 
 The library includes a comprehensive test suite with 106 tests:

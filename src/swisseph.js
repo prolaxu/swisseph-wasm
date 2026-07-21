@@ -40,6 +40,9 @@
 import WasmSwissEph from '../wasm/swisseph.js';
 
 class SwissEph {
+  // Backing store for the Emscripten module; populated by initSwissEph().
+  #module;
+
   // #region Constants
   SE_AUNIT_TO_KM = 149597870.7;
   SE_AUNIT_TO_LIGHTYEAR = 1.5812507409819728411242766893179e-5; // = 1.0 / 63241.07708427
@@ -317,6 +320,17 @@ class SwissEph {
   // #endregion Constants
   
   
+  // Guarded accessor for the underlying Emscripten module. Every public
+  // method reads the module through this getter, so calling any of them
+  // before initSwissEph() throws a clear error instead of a cryptic
+  // "Cannot read properties of undefined (reading 'ccall')".
+  get SweModule() {
+    if (!this.#module) {
+      throw new Error('SwissEph not initialized. Call await initSwissEph() first.');
+    }
+    return this.#module;
+  }
+
   // Initializes the Swiss Ephemeris WebAssembly module
   async initSwissEph() {
     let moduleConfig = {};
@@ -348,7 +362,7 @@ class SwissEph {
       };
     }
 
-    this.SweModule = await WasmSwissEph(moduleConfig);
+    this.#module = await WasmSwissEph(moduleConfig);
 
     // Ensure HEAP32 is available
     if (!this.SweModule.HEAP32) {
