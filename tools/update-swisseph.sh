@@ -10,14 +10,14 @@
 # vendored files. No git submodule, no large download.
 #
 # Usage:
-#   ./update-swisseph.sh              # fetch latest master
-#   ./update-swisseph.sh v2.10.03     # fetch a specific tag/branch/commit
+#   ./tools/update-swisseph.sh              # fetch latest master
+#   ./tools/update-swisseph.sh v2.10.03     # fetch a specific tag/branch/commit
 #
 # After it runs, review `git diff deps/swisseph`, then rebuild:
-#   ./compile.sh && npm test
+#   ./tools/compile.sh && npm test
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 REPO="https://github.com/aloistr/swisseph.git"
 REF="${1:-master}"
@@ -49,4 +49,4 @@ ver="$(grep -E '#define[[:space:]]+SE_VERSION' deps/swisseph/sweph.h \
 n="$(ls deps/swisseph/*.c | wc -l | tr -d ' ')"
 info "Done. Vendored version ${ver:-unknown}, ${n} .c files."
 echo "     Review: git diff deps/swisseph"
-echo "     Rebuild: ./compile.sh && npm test"
+echo "     Rebuild: ./tools/compile.sh && npm test"

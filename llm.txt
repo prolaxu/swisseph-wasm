@@ -1,238 +1,110 @@
-# swisseph-wasm: LLM API Documentation
+# swisseph-wasm
 
-This file helps Large Language Models (LLMs) understand the `swisseph-wasm` package.
-It provides a high-precision WebAssembly wrapper for the Swiss Ephemeris (C library) in JavaScript.
+> High-precision astronomical/astrological calculations for JavaScript. The
+> Swiss Ephemeris C library (v2.10.03) compiled to WebAssembly, with a
+> hand-written wrapper class and complete TypeScript types. Works in Node and
+> the browser. License: GPL-3.0-or-later (Swiss Ephemeris is dual-licensed;
+> commercial use may require a license from Astrodienst AG).
 
-## 1. Core Concepts & Initialization
+## Critical usage rules (read before generating code)
 
-*   **Async Init**: You MUST await `initSwissEph()` before using the library.
-*   **Memory cleanup**: You MUST call `close()` to prevent memory leaks.
-*   **Coordinate System**: Defaults to Tropical Zodiac, degrees.
-*   **Time**: All calculations operate on Julian Days (UT or ET).
-*   **Ephemeris Files**: The WASM module handles these internally. Defaults to Moshier (analytic) if files are missing, but `SEFLG_MOSEPH` explicitly forces it.
+- **Always `await` initialization before any call.** Every method throws
+  `SwissEph not initialized. Call await initSwissEph() first.` until init runs.
+  ```js
+  import SwissEph from 'swisseph-wasm';
+  const swe = new SwissEph();
+  await swe.initSwissEph();
+  ```
+- **ESM only** (`"type": "module"`). Default export is the `SwissEph` class.
+- **Constants are instance properties** (`swe.SE_SUN`, `swe.SEFLG_SWIEPH`, …),
+  available only after `new SwissEph()`. There is no static/enum export.
+- **WebAssembly, not the native lib.** Host OS paths do NOT work with
+  `set_ephe_path()`. Ephemeris files are bundled in `wasm/swisseph.data` and
+  mounted at `/sweph`; `initSwissEph()` points the engine there automatically.
+  No `set_ephe_path()` call is needed. Bundled date coverage ≈ 1800–2400 AD.
+- **House system** is a single-letter string (`'P'` Placidus, `'K'` Koch,
+  `'W'` whole-sign, …), passed as-is.
+- **Angles are degrees** unless the `SEFLG_RADIANS` flag is set.
+- **`jd`** is a Julian Day number. Use `julday(year, month, day, hourDecimal)`.
 
-### Basic Pattern
-```typescript
+## Error handling
+
+- `calc` / `calc_ut` **throw** on error (message included).
+- Most other fallible methods **return `null`** (or `{ error }` for
+  `nod_aps`). After a null/`{error}`, call **`swe.getLastError()`** for the C
+  library's message (populated by `calc*`, `fixstar*`, `nod_aps*`,
+  `helio_cross*`; other methods may return `null` with an empty message).
+
+## Return shapes (commonly mis-remembered)
+
+- `houses(jd, lat, lon, hsys)` → `{ cusps: Float64Array(13), ascmc: Float64Array(10) }`.
+  Cusps are `cusps[1]..cusps[12]` (index 0 unused). `ascmc[0]`=Ascendant, `[1]`=MC.
+- `calc(jd, ipl, flags)` → `{ longitude, latitude, distance, longitudeSpeed, latitudeSpeed, distanceSpeed }`.
+- `calc_ut(...)` → `Float64Array(6)` `[lon, lat, dist, lonSpeed, latSpeed, distSpeed]`.
+- `nod_aps(...)` → `{ ascending, descending, perihelion, aphelion, asc_node, desc_node, peri_lon, aphe_lon }` or `{ error }`.
+- `refrac(inalt, atpress, attemp, calcFlag)` → number (converted altitude).
+- Eclipses/occultations: `*_where` → `{ retFlag, geopos, attr }`; `*_how` →
+  `{ retFlag, attr }`; `*_when` / `*_when_glob` → `{ retFlag, tret }`;
+  `*_when_loc` → `{ retFlag, tret, attr }`. `retFlag` carries `SE_ECL_*` bits;
+  `tret[0]` is the event time.
+- `rise_trans(jd, ipl, starname, epheFlag, rsmi, geopos[lon,lat,alt], atpress, attemp)`
+  → `Float64Array` (event time in `[0]`) or null. `rsmi` = `SE_CALC_RISE` / `SE_CALC_SET` / `SE_CALC_MTRANSIT` / `SE_CALC_ITRANSIT`.
+
+## Minimal example
+
+```js
 import SwissEph from 'swisseph-wasm';
-
-const swe = new SwissEph();
-await swe.initSwissEph(); 
-
-// ... operations ...
-
-swe.close();
-```
-
-## 2. API Reference (TypeScript Definitions)
-
-### Date & Time Conversions
-```typescript
-/** Calculate Julian Day from UTC date */
-julday(year: number, month: number, day: number, hour: number, gregflag?: number): number;
-
-/** Detailed UTC to Julian Day conversion */
-utc_to_jd(year: number, month: number, day: number, hour: number, minute: number, second: number, gregflag: number): { julianDayET: number, julianDayUT: number };
-
-/** Reverse Julian Day to UTC date */
-revjul(julianDay: number, gregflag: number): { year: number, month: number, day: number, hour: number };
-
-/** Calculate Delta T (difference between ET and UT) */
-deltat(julianDay: number): number;
-
-/** Calculate Sidereal Time */
-sidtime(julianDay: number): number;
-```
-
-### Planetary Calculations
-```typescript
-/** 
- * Calculate body position (Universal Time)
- * Returns array: [longitude, latitude, distance, speedLon, speedLat, speedDist]
- */
-calc_ut(julianDay: number, body: number, flags: number): number[];
-
-/** 
- * Calculate body position (Universal Time) - Object Return
- */
-calc(julianDay: number, body: number, flags: number): {
-  longitude: number;
-  latitude: number;
-  distance: number;
-  longitudeSpeed: number;
-  latitudeSpeed: number;
-  distanceSpeed: number;
-};
-
-/** Get Planet Name */
-get_planet_name(body: number): string;
-```
-
-### Houses & Angles
-```typescript
-/** Calculate House Cusps and Ascendant */
-houses(julianDay: number, lat: number, lon: number, hsys: string): {
-  cusp: number[];       // Array of 13 numbers (index 1-12 used)
-  asc: number;          // Ascendant
-  mc: number;           // Midheaven
-  armc: number;         // ARMC
-  vertex: number;       // Vertex
-};
-
-/** Calculate House Position of a body */
-house_pos(armc: number, geolat: number, eps: number, hsys: string, lon: number, lat: number): number;
-```
-
-### Sidereal Mode (Vedic/Jyotish)
-```typescript
-/** Set the Sidereal Ayanamsa Mode */
-set_sid_mode(mode: number, t0: number, ayan_t0: number): void;
-
-/** Get the current Ayanamsa value */
-get_ayanamsa(julianDay: number): number;
-```
-
-### Eclipses & Phenomena
-```typescript
-/** Calculate Planetary Phenomena (Phase, Phase Angle, Elongation, etc.) */
-pheno_ut(julianDay: number, body: number, flags: number): {
-  phaseAngle: number;
-  phase: number;
-  elongation: number;
-  apparentDiameter: number;
-  apparentMagnitude: number;
-};
-```
-
-### Math Utilities
-```typescript
-/** Normalize degrees to 0-360 */
-degnorm(deg: number): number;
-
-/** Convert degrees to DMS string (e.g. "12°30'45") */
-split_deg(deg: number, roundFlag: number): { degree: number, min: number, second: number, fraction: number, sign: number };
-```
-
-## 3. Constants Reference
-
-### Planets (Bodies)
-```javascript
-swe.SE_SUN = 0;
-swe.SE_MOON = 1;
-swe.SE_MERCURY = 2;
-swe.SE_VENUS = 3;
-swe.SE_MARS = 4;
-swe.SE_JUPITER = 5;
-swe.SE_SATURN = 6;
-swe.SE_URANUS = 7;
-swe.SE_NEPTUNE = 8;
-swe.SE_PLUTO = 9;
-swe.SE_MEAN_NODE = 10;  // Mean North Node (Rahu)
-swe.SE_TRUE_NODE = 11;  // True North Node
-swe.SE_MEAN_APOG = 12;  // Mean Lilith (Black Moon)
-swe.SE_OSCU_APOG = 13;  // Osculating Lilith
-swe.SE_CHIRON = 15;
-swe.SE_PHOLUS = 16;
-swe.SE_CERES = 17;
-swe.SE_PALLAS = 18;
-swe.SE_JUNO = 19;
-swe.SE_VESTA = 20;
-```
-
-### Calculation Flags (Bitwise Combinable)
-```javascript
-swe.SEFLG_SWIEPH = 2;       // Use Swiss Ephemeris data (Precision: 0.001")
-swe.SEFLG_JPLEPH = 1;       // Use JPL DE431 data
-swe.SEFLG_MOSEPH = 4;       // Use Moshier analytic (Precision: ~0.1-1.0") - NO FILES NEEDED
-swe.SEFLG_HELCTR = 8;       // Heliocentric
-swe.SEFLG_TRUEPOS = 16;     // True geometric position
-swe.SEFLG_J2000 = 32;       // J2000 Equinox
-swe.SEFLG_NONUT = 64;       // No Nutation
-swe.SEFLG_SPEED = 256;      // Calculate speeds
-swe.SEFLG_NOGDEFL = 512;    // No gravitational deflection
-swe.SEFLG_NOABERR = 1024;   // No aberration
-swe.SEFLG_EQUATORIAL = 2048;// Equatorial (RA/Dec)
-swe.SEFLG_XYZ = 4096;       // Cartesian (X,Y,Z)
-swe.SEFLG_RADIANS = 8192;   // Return radians
-swe.SEFLG_BARYCTR = 16384;  // Barycentric
-swe.SEFLG_TOPOCTR = 32768;  // Topocentric
-swe.SEFLG_SIDEREAL = 65536; // Sidereal Zodiac
-```
-
-### Sidereal Modes (Ayanamsas)
-```javascript
-swe.SE_SIDM_FAGAN_BRADLEY = 0;
-swe.SE_SIDM_LAHIRI = 1;       // Official Indian
-swe.SE_SIDM_DELUCE = 2;
-swe.SE_SIDM_RAMAN = 3;
-swe.SE_SIDM_USHASHASHI = 4;
-swe.SE_SIDM_KRISHNAMURTI = 5; // KP Astrology
-swe.SE_SIDM_DJWHAL_KHUL = 6;
-swe.SE_SIDM_YUKTESHWAR = 7;
-swe.SE_SIDM_JN_BHASIN = 8;
-swe.SE_SIDM_BABYL_KUGLER1 = 9;
-```
-
-### House Systems
-```javascript
-'P' // Placidus
-'K' // Koch
-'O' // Porphyrius
-'R' // Regiomontanus
-'C' // Campanus
-'E' // Equal (Cusp 1 = Asc)
-'A' // Equal (Cusp 1 = Aries)
-'W' // Whole Sign
-'X' // Vedic Equal (Cusp 1 = Asc +- 15deg)
-'B' // Alcabitius
-'M' // Morinus
-```
-
-### Calendars
-```javascript
-swe.SE_JUL_CAL = 0;
-swe.SE_GREG_CAL = 1;
-```
-
-## 4. Usage Examples
-
-### Example: Full Natal Chart (Tropical)
-```javascript
 const swe = new SwissEph();
 await swe.initSwissEph();
 
-// 1. Convert Date to Julian Day (UT)
-// Date: 2000-01-01 12:00:00 UTC
-const jd = swe.julday(2000, 1, 1, 12, swe.SE_GREG_CAL);
+const jd = swe.julday(2000, 1, 1, 12);            // 2451545
+const sun = swe.calc(jd, swe.SE_SUN, swe.SEFLG_SWIEPH);
+console.log(sun.longitude);                        // 280.368...
 
-// 2. Calculate Planets
-const bodies = [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS];
-const flags = swe.SEFLG_SWIEPH | swe.SEFLG_SPEED; 
-
-bodies.forEach(body => {
-  const pos = swe.calc_ut(jd, body, flags);
-  console.log(`${swe.get_planet_name(body)}: ${pos[0].toFixed(4)}°`);
-});
-
-// 3. Calculate Houses (Placidus) at Lat: 47.0N, Lon: 8.0E
-const houses = swe.houses(jd, 47.0, 8.0, 'P');
-console.log('Ascendant:', houses.asc);
-console.log('MC:', houses.mc);
-console.log('House 1:', houses.cusp[1]);
+const h = swe.houses(jd, 47.0, 8.0, 'P');
+console.log(h.ascmc[0]);                           // Ascendant, degrees
 
 swe.close();
 ```
 
-### Example: Vedic (Sidereal) Chart
-```javascript
-// Set Ayanamsa to Lahiri
-swe.set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+## API surface (104 methods)
 
-// Use Sidereal Flag
-const flags = swe.SEFLG_SWIEPH | swe.SEFLG_SIDEREAL;
+- **Time**: `julday`, `date_conversion`, `revjul`, `utc_to_jd`, `jdet_to_utc`,
+  `jdut1_to_utc`, `utc_time_zone`, `deltat`, `deltat_ex`, `time_equ`,
+  `sidtime`, `sidtime0`, `day_of_week`, `lat_to_lmt`, `lmt_to_lat`.
+- **Positions**: `calc`, `calc_ut`, `calc_pctr`, `get_planet_name`,
+  `nod_aps`, `nod_aps_ut`, `get_orbital_elements`,
+  `orbit_max_min_true_distance`, `pheno`, `pheno_ut`.
+- **Fixed stars**: `fixstar`, `fixstar_ut`, `fixstar_mag`, `fixstar2`,
+  `fixstar2_ut`, `fixstar2_mag`.
+- **Houses**: `houses`, `houses_ex`, `houses_ex2`, `houses_armc`,
+  `houses_armc_ex2`, `house_pos`, `house_name`.
+- **Eclipses / occultations**: `sol_eclipse_where`, `sol_eclipse_how`,
+  `sol_eclipse_when_loc`, `sol_eclipse_when_glob`, `lun_eclipse_how`,
+  `lun_eclipse_when`, `lun_eclipse_when_loc`, `lun_occult_where`,
+  `lun_occult_when_loc`, `lun_occult_when_glob`.
+- **Rise/set & horizon**: `rise_trans`, `rise_trans_true_hor`, `azalt`,
+  `azalt_rev`, `refrac`, `refrac_extended`, `set_lapse_rate`.
+- **Crossings**: `solcross`, `solcross_ut`, `mooncross`, `mooncross_ut`,
+  `mooncross_node`, `mooncross_node_ut`, `helio_cross`, `helio_cross_ut`.
+- **Sidereal / ayanamsa**: `set_sid_mode`, `get_ayanamsa`, `get_ayanamsa_ut`,
+  `get_ayanamsa_ex`, `get_ayanamsa_ex_ut`, `get_ayanamsa_name`.
+- **Heliacal**: `heliacal_ut`, `heliacal_pheno_ut`, `vis_limit_mag`,
+  `gauquelin_sector`.
+- **Coordinate/angle math**: `cotrans`, `cotrans_sp`, `degnorm`, `radnorm`,
+  `rad_midp`, `deg_midp`, `split_deg`, `csnorm`, `csroundsec`, `d2l`,
+  `difcsn`, `difdegn`, `difcs2n`, `difdeg2n`, `difrad2n`.
+- **Formatting**: `cs2timestr`, `cs2lonlatstr`, `cs2degstr`.
+- **Config / misc**: `set_ephe_path`, `set_jpl_file`, `set_topo`,
+  `set_tid_acc`, `get_tid_acc`, `set_delta_t_userdef`, `set_interpolate_nut`,
+  `get_astro_models`, `set_astro_models`, `get_library_path`,
+  `get_current_file_data`, `version`, `getLastError`, `close`.
 
-const sun = swe.calc_ut(jd, swe.SE_SUN, flags);
-console.log('Sidereal Sun:', sun[0]); // Returns positions in Sidereal zodiac
+## Docs
 
-const ayanamsa = swe.get_ayanamsa(jd);
-console.log('Current Ayanamsa:', ayanamsa);
-```
+- [README](README.md) — install, cross-platform setup, examples, ephemeris paths, building from source
+- [types/index.d.ts](types/index.d.ts) — complete TypeScript definitions (source of truth for signatures)
+- [DOCUMENTATION.md](docs/DOCUMENTATION.md) — extended guide
+- [CHANGELOG.md](CHANGELOG.md) — release notes (v0.1.0 changed several return shapes)
+- [examples/playground.html](examples/playground.html) — interactive editor with autocomplete
+- Verification: `npm test` (Node assertions) and `npm run verify` (diff every method against the native C library)

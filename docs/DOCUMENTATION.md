@@ -1,5 +1,7 @@
 # SwissEph WebAssembly Library Documentation
 
+> [Docs index](README.md) · [Quick Reference](QUICK_REFERENCE.md) · [Usage Guide](USAGE_GUIDE.md) · [▶ Live Playground](https://prolaxu.github.io/swisseph-wasm/examples/playground.html) · [Install & overview](../README.md)
+
 A JavaScript wrapper for the Swiss Ephemeris WebAssembly module, providing high-precision astronomical calculations for astrology, astronomy, and related applications.
 
 ## Table of Contents

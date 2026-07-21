@@ -34,7 +34,7 @@ Experience all features including:
 - ⚖️ Sidereal vs Tropical comparisons
 - 🏠 House system calculations
 - 📐 Planetary aspects analysis
-- 🔧 Interactive API explorer
+- 🔧 Interactive playground with API autocomplete
 - 📊 Visual astrological charts
 
 ## 📦 Installation
@@ -385,8 +385,11 @@ module.exports = {
 
 | Document | Description |
 |----------|-------------|
-| [**DOCUMENTATION.md**](DOCUMENTATION.md) | Complete API reference and usage guide |
-| [**QUICK_REFERENCE.md**](QUICK_REFERENCE.md) | Quick developer reference |
+| [**docs/**](docs/README.md) | Documentation index — start here |
+| [**docs/DOCUMENTATION.md**](docs/DOCUMENTATION.md) | Complete API reference and usage guide |
+| [**docs/QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Quick developer reference (cheatsheet) |
+| [**docs/USAGE_GUIDE.md**](docs/USAGE_GUIDE.md) | Framework/platform integration (Node, Vite, React, Vue, Next.js, CDN) |
+| [**Playground**](https://prolaxu.github.io/swisseph-wasm/examples/playground.html) | Live editor with autocomplete on the full API |
 | [**examples/README.md**](examples/README.md) | Example usage patterns |
 | [**tests/README.md**](tests/README.md) | Test suite documentation |
 
@@ -475,17 +478,17 @@ The prebuilt `wasm/` directory is committed, so **you do not need to build anyth
 ### Build steps
 
 ```bash
-./init-dependency.sh    # preflight: verifies source, data and emcc are present
-./compile.sh            # compiles deps/swisseph -> wasm/swisseph.{js,wasm,data}
+./tools/init-dependency.sh    # preflight: verifies source, data and emcc are present
+./tools/compile.sh            # compiles deps/swisseph -> wasm/swisseph.{js,wasm,data}
 npm test                # runs the test suite against the freshly built wasm/
 ```
 
 ### Changing the vendored Swiss Ephemeris version
 
 ```bash
-./update-swisseph.sh              # pull latest upstream master
-./update-swisseph.sh v2.10.03     # or pin a specific tag/commit
-git diff deps/swisseph            # review the change, then ./compile.sh && npm test
+./tools/update-swisseph.sh              # pull latest upstream master
+./tools/update-swisseph.sh v2.10.03     # or pin a specific tag/commit
+git diff deps/swisseph            # review the change, then ./tools/compile.sh && npm test
 ```
 
 `update-swisseph.sh` does a shallow, blobless, sparse fetch of the upstream `*.c`/`*.h` only — it never downloads the hundreds of MB of ephemeris data that upstream bundles alongside its source.
@@ -497,7 +500,7 @@ To support dates outside ~1800–2400 AD (or to add more asteroids):
 1. Download the `.se1` files you need from the official archive:
    <https://www.astro.com/ftp/swisseph/ephe/>
 2. Place them in `deps/sweph/`.
-3. Add a matching `--preload-file ./deps/sweph/<file>@/sweph/<file>` line to `compile.sh`, then run `./compile.sh`. The files then appear under `/sweph` at runtime — exactly where the engine looks.
+3. Add a matching `--preload-file ./deps/sweph/<file>@/sweph/<file>` line to `compile.sh`, then run `./tools/compile.sh`. The files then appear under `/sweph` at runtime — exactly where the engine looks.
 
 ## 🧪 Testing
 
@@ -539,9 +542,18 @@ swiss-wasm/
 ├── examples/
 │   ├── basic-usage.js           # Basic usage examples
 │   ├── birth-chart.js           # Birth chart calculator
+│   ├── playground.html          # Live editor with autocomplete
 │   └── README.md                # Examples documentation
-├── DOCUMENTATION.md             # Complete API reference
-├── QUICK_REFERENCE.md           # Quick developer guide
+├── docs/
+│   ├── README.md                # Documentation index
+│   ├── DOCUMENTATION.md         # Complete API reference
+│   ├── QUICK_REFERENCE.md       # Cheatsheet
+│   └── USAGE_GUIDE.md           # Framework/platform integration
+├── tools/
+│   ├── compile.sh               # Rebuild wasm/ (needs emcc)
+│   ├── init-dependency.sh       # Build preflight check
+│   ├── update-swisseph.sh       # Bump vendored Swiss Ephemeris source
+│   └── run_verification.sh      # JS-vs-C verification (npm run verify)
 └── README.md                    # This file
 ```
 
@@ -818,4 +830,4 @@ We welcome contributions! Please feel free to submit a Pull Request.
 
 ---
 
-**Ready to calculate the cosmos? Start with the [Quick Reference](QUICK_REFERENCE.md) or dive into the [Complete Documentation](DOCUMENTATION.md)!** 🌟
+**Ready to calculate the cosmos? Start with the [Quick Reference](docs/QUICK_REFERENCE.md) or dive into the [Complete Documentation](docs/DOCUMENTATION.md)!** 🌟

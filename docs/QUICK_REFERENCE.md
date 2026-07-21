@@ -1,5 +1,7 @@
 # SwissEph Quick Reference Guide
 
+> [Docs index](README.md) · [Full API](DOCUMENTATION.md) · [Usage Guide](USAGE_GUIDE.md) · [▶ Live Playground](https://prolaxu.github.io/swisseph-wasm/examples/playground.html) · [Install & overview](../README.md)
+
 ## Basic Setup
 
 ```javascript

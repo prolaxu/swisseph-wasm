@@ -13,10 +13,10 @@
 #   * deps/sweph    : ephemeris data files preloaded into the Emscripten
 #                     virtual filesystem at /sweph by compile.sh
 #
-# To change the vendored Swiss Ephemeris version, use ./update-swisseph.sh.
+# To change the vendored Swiss Ephemeris version, use ./tools/update-swisseph.sh.
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*"; }
@@ -31,7 +31,7 @@ if [ -f deps/swisseph/sweph.h ] && ls deps/swisseph/*.c >/dev/null 2>&1; then
   n="$(ls deps/swisseph/*.c | wc -l | tr -d ' ')"
   info "Vendored Swiss Ephemeris source present: version ${ver:-unknown}, ${n} .c files."
 else
-  err "deps/swisseph C source missing. Run ./update-swisseph.sh to fetch it."
+  err "deps/swisseph C source missing. Run ./tools/update-swisseph.sh to fetch it."
   fail=1
 fi
 
@@ -52,7 +52,7 @@ fi
 # --- 3. Toolchain ----------------------------------------------------------
 if command -v emcc >/dev/null 2>&1; then
   info "Emscripten found: $(emcc --version 2>/dev/null | head -1)"
-  echo "     Next: ./compile.sh    # rebuilds wasm/"
+  echo "     Next: ./tools/compile.sh    # rebuilds wasm/"
 else
   warn "emcc (Emscripten) not found - required only to rebuild wasm/."
   echo "     Install: https://emscripten.org/docs/getting_started/downloads.html"
@@ -60,7 +60,7 @@ else
 fi
 
 if [ "$fail" -ne 0 ]; then
-  err "Preflight failed. Resolve the items above before running ./compile.sh."
+  err "Preflight failed. Resolve the items above before running ./tools/compile.sh."
   exit 1
 fi
 info "All build dependencies present."

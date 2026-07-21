@@ -1,5 +1,7 @@
 # SwissEph WebAssembly Usage Guide
 
+> [Docs index](README.md) · [Full API](DOCUMENTATION.md) · [Quick Reference](QUICK_REFERENCE.md) · [▶ Live Playground](https://prolaxu.github.io/swisseph-wasm/examples/playground.html) · [Install & overview](../README.md)
+
 This guide provides comprehensive instructions for using SwissEph WebAssembly across different platforms and frameworks.
 
 ## 🚀 Quick Start
@@ -366,6 +368,6 @@ async function robustCalculation() {
 ## 📞 Support
 
 - **Documentation**: [DOCUMENTATION.md](DOCUMENTATION.md)
-- **Examples**: [examples/](examples/)
+- **Examples**: [examples/](../examples/)
 - **Issues**: [GitHub Issues](https://github.com/prolaxu/swisseph-wasm/issues)
 - **Quick Reference**: [QUICK_REFERENCE.md](QUICK_REFERENCE.md)

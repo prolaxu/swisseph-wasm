@@ -17,10 +17,9 @@
     "wasm/",
     "types/",
     "examples/",
-    "DOCUMENTATION.md",
-    "QUICK_REFERENCE.md",
+    "docs/",
     "README.md",
-    "llms.txt",
+    "llm.txt",
     "CHANGELOG.md",
     "LICENSE"
   ],
@@ -28,8 +27,8 @@
     "test": "node tests/swisseph.test.js",
     "prepublishOnly": "node tests/swisseph.test.js",
     "demo": "python3 -m http.server 8000",
-    "docs": "echo 'Documentation available in DOCUMENTATION.md'",
-    "verify": "bash verification/run_verification.sh"
+    "docs": "echo 'Docs in ./docs (start: docs/README.md). Live playground: https://prolaxu.github.io/swisseph-wasm/examples/playground.html'",
+    "verify": "bash tools/run_verification.sh"
   },
   "keywords": [
     "swiss-ephemeris",

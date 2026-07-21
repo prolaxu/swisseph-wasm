@@ -1,4 +1,6 @@
 #!/bin/bash
+# Run from the repo root regardless of where the script is invoked.
+cd "$(dirname "$0")/.."
 mkdir -p wasm
 emcc -O3 -o swisseph.js \
     $(ls deps/swisseph/*.c | grep -v 'swetest.c' | grep -v 'swemini.c' | grep -v 'obama.c' | grep -v 'swephgen') \
