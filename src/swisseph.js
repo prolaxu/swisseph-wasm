@@ -1013,76 +1013,61 @@ class SwissEph {
     );
   }
 
-  nod_aps(julianDay, planet, flags, method) {
-    const xnPtr = this.SweModule._malloc(4 * 8);
-    const xasPtr = this.SweModule._malloc(4 * 8);
+  // Shared implementation for swe_nod_aps / swe_nod_aps_ut. The C function
+  // writes four output arrays of 6 doubles each: ascending node, descending
+  // node, perihelion, aphelion (plus a serr buffer).
+  #nodAps(fnName, julianDay, planet, flags, method) {
+    const xnascPtr = this.SweModule._malloc(6 * 8);
+    const xndscPtr = this.SweModule._malloc(6 * 8);
+    const xperiPtr = this.SweModule._malloc(6 * 8);
+    const xaphePtr = this.SweModule._malloc(6 * 8);
     const serrPtr = this.SweModule._malloc(256);
-    
+
     const retFlag = this.SweModule.ccall(
-      'swe_nod_aps',
+      fnName,
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
-      [julianDay, planet, flags, method, xnPtr, xasPtr, serrPtr]
+      ['number', 'number', 'number', 'number', 'pointer', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [julianDay, planet, flags, method, xnascPtr, xndscPtr, xperiPtr, xaphePtr, serrPtr]
     );
 
+    const freeAll = () => {
+      this.SweModule._free(xnascPtr);
+      this.SweModule._free(xndscPtr);
+      this.SweModule._free(xperiPtr);
+      this.SweModule._free(xaphePtr);
+      this.SweModule._free(serrPtr);
+    };
+
     if (retFlag < 0) {
-       this.SweModule._free(xnPtr);
-       this.SweModule._free(xasPtr);
-       this.SweModule._free(serrPtr);
-       return { error: retFlag };
+      freeAll();
+      return { error: retFlag };
     }
 
-    const nodes = new Float64Array(this.SweModule.HEAPF64.buffer, xnPtr, 4).slice();
-    const apsides = new Float64Array(this.SweModule.HEAPF64.buffer, xasPtr, 4).slice();
-    
-    this.SweModule._free(xnPtr);
-    this.SweModule._free(xasPtr);
-    this.SweModule._free(serrPtr);
-    
+    const buf = this.SweModule.HEAPF64.buffer;
+    const ascending = new Float64Array(buf, xnascPtr, 6).slice();
+    const descending = new Float64Array(buf, xndscPtr, 6).slice();
+    const perihelion = new Float64Array(buf, xperiPtr, 6).slice();
+    const aphelion = new Float64Array(buf, xaphePtr, 6).slice();
+    freeAll();
+
     return {
-       nodes: Array.from(nodes),
-       apsides: Array.from(apsides),
-       asc_node: nodes[0],
-       desc_node: nodes[1],
-       perihelion: apsides[0],
-       aphelion: apsides[1]
+      ascending: Array.from(ascending),
+      descending: Array.from(descending),
+      perihelion: Array.from(perihelion),
+      aphelion: Array.from(aphelion),
+      asc_node: ascending[0],
+      desc_node: descending[0],
+      peri_lon: perihelion[0],
+      aphe_lon: aphelion[0],
     };
   }
 
+  nod_aps(julianDay, planet, flags, method) {
+    return this.#nodAps('swe_nod_aps', julianDay, planet, flags, method);
+  }
+
   nod_aps_ut(julianDay, planet, flags, method) {
-    const xnPtr = this.SweModule._malloc(4 * 8);
-    const xasPtr = this.SweModule._malloc(4 * 8);
-    const serrPtr = this.SweModule._malloc(256);
-    
-    const retFlag = this.SweModule.ccall(
-      'swe_nod_aps_ut',
-      'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
-      [julianDay, planet, flags, method, xnPtr, xasPtr, serrPtr]
-    );
-
-    if (retFlag < 0) {
-       this.SweModule._free(xnPtr);
-       this.SweModule._free(xasPtr);
-       this.SweModule._free(serrPtr);
-       return { error: retFlag };
-    }
-
-    const nodes = new Float64Array(this.SweModule.HEAPF64.buffer, xnPtr, 4).slice();
-    const apsides = new Float64Array(this.SweModule.HEAPF64.buffer, xasPtr, 4).slice();
-    
-    this.SweModule._free(xnPtr);
-    this.SweModule._free(xasPtr);
-    this.SweModule._free(serrPtr);
-    
-    return {
-       nodes: Array.from(nodes),
-       apsides: Array.from(apsides),
-       asc_node: nodes[0],
-       desc_node: nodes[1],
-       perihelion: apsides[0],
-       aphelion: apsides[1]
-    };
+    return this.#nodAps('swe_nod_aps_ut', julianDay, planet, flags, method);
   }
 
   get_orbital_elements(julianDay, planet, flags) {
@@ -1461,30 +1446,38 @@ class SwissEph {
     return retFlag < 0 ? null : results;
   }
 
-  refrac(julianDay, geoLat, geoLon, altitude, pressure, temperature) {
-    const resultPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
-    const retFlag = this.SweModule.ccall(
+  // swe_refrac(double inalt, double atpress, double attemp, int32 calc_flag)
+  // returns the (apparent or true) altitude in degrees.
+  refrac(inalt, atpress, attemp, calcFlag) {
+    return this.SweModule.ccall(
       'swe_refrac',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, geoLat, geoLon, altitude, pressure, temperature, resultPtr]
+      ['number', 'number', 'number', 'number'],
+      [inalt, atpress, attemp, calcFlag]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
   }
 
-  refrac_extended(julianDay, geoLat, geoLon, altitude, pressure, temperature, distance) {
-    const resultPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
-    const retFlag = this.SweModule.ccall(
+  // swe_refrac_extended(double inalt, double geoalt, double atpress,
+  //   double attemp, double lapse_rate, int32 calc_flag, double *dret)
+  // returns the converted altitude; dret = [true alt, apparent alt,
+  // refraction, dip of horizon].
+  refrac_extended(inalt, geoalt, atpress, attemp, lapseRate, calcFlag) {
+    const dretPtr = this.SweModule._malloc(4 * Float64Array.BYTES_PER_ELEMENT);
+    const converted = this.SweModule.ccall(
       'swe_refrac_extended',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
-      [julianDay, geoLat, geoLon, altitude, pressure, temperature, distance, resultPtr]
+      ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
+      [inalt, geoalt, atpress, attemp, lapseRate, calcFlag, dretPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
-    this.SweModule._free(resultPtr);
-    return retFlag < 0 ? null : results;
+    const dret = new Float64Array(this.SweModule.HEAPF64.buffer, dretPtr, 4).slice();
+    this.SweModule._free(dretPtr);
+    return {
+      converted,
+      trueAltitude: dret[0],
+      apparentAltitude: dret[1],
+      refraction: dret[2],
+      dip: dret[3],
+    };
   }
 
   set_lapse_rate(lapseRate) {

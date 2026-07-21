@@ -267,14 +267,16 @@ declare module 'swisseph-wasm' {
     pheno_ut(jd: number, planet: number, flags: number): Float64Array | null;
 
     /**
-     * Atmospheric refraction. Returns null on error.
+     * Atmospheric refraction. `calcFlag` is SE_TRUE_TO_APP or SE_APP_TO_TRUE.
+     * Returns the converted altitude in degrees.
      */
-    refrac(jd: number, geolat: number, geolon: number, altitude: number, pressure: number, temperature: number): Float64Array | null;
+    refrac(inalt: number, atpress: number, attemp: number, calcFlag: number): number;
 
     /**
-     * Extended atmospheric refraction. Returns null on error.
+     * Extended atmospheric refraction. Returns the converted altitude plus the
+     * detailed dret components.
      */
-    refrac_extended(jd: number, geolat: number, geolon: number, altitude: number, pressure: number, temperature: number, distance: number): Float64Array | null;
+    refrac_extended(inalt: number, geoalt: number, atpress: number, attemp: number, lapseRate: number, calcFlag: number): RefracExtendedResult;
 
     /**
      * Nodes and apsides (ET). Returns { error } on failure.
@@ -626,17 +628,31 @@ declare module 'swisseph-wasm' {
   }
 
   /**
-   * Nodes and apsides result. On error only `error` (the negative C return
-   * code) is present.
+   * Nodes and apsides result. Each of the four arrays holds 6 doubles
+   * (position + speed). On error only `error` (the negative C return code) is
+   * present.
    */
   export type NodesApsidesResult =
     | {
-        nodes: number[];
-        apsides: number[];
+        ascending: number[];
+        descending: number[];
+        perihelion: number[];
+        aphelion: number[];
         asc_node: number;
         desc_node: number;
-        perihelion: number;
-        aphelion: number;
+        peri_lon: number;
+        aphe_lon: number;
       }
     | { error: number };
+
+  /**
+   * Extended refraction result from refrac_extended
+   */
+  export interface RefracExtendedResult {
+    converted: number;
+    trueAltitude: number;
+    apparentAltitude: number;
+    refraction: number;
+    dip: number;
+  }
 }
