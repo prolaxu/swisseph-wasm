@@ -11,7 +11,7 @@ A high-precision JavaScript wrapper for the Swiss Ephemeris WebAssembly module, 
 - **🔧 Easy Integration**: Simple import, works with all modern bundlers
 - **📚 Comprehensive API**: Full access to Swiss Ephemeris functions
 - **💻 Modern JavaScript**: ES6+ with async/await support
-- **🧪 Well Tested**: 106 tests with 86% coverage
+- **🧪 Well Tested**: every method verified against the real Swiss Ephemeris C library, in Node and the browser
 - **📖 Complete Documentation**: Extensive guides and examples
 - **🏢 Professional Grade**: Suitable for commercial applications
 - **🔄 CDN Ready**: Available via jsdelivr CDN for quick prototyping
@@ -64,7 +64,7 @@ pnpm add swisseph-wasm
 
 - **Core Library** (`src/swisseph.js`) - Main JavaScript wrapper
 - **WebAssembly Module** (`wasm/`) - Compiled Swiss Ephemeris
-- **Comprehensive Tests** (`tests/`) - 106 tests covering all functionality
+- **Comprehensive Tests** (`tests/`, `verification/`) - Node assertions plus a JS-vs-C verification harness
 - **Documentation** - Complete API reference and guides
 - **Examples** - Practical usage examples and patterns
 - **Quick Reference** - Handy developer reference
@@ -449,20 +449,24 @@ To support dates outside ~1800–2400 AD (or to add more asteroids):
 
 ## 🧪 Testing
 
-The library includes a comprehensive test suite with 106 tests:
-
 ```bash
 npm install
-npm test                 # Run all tests
-npm run test:coverage   # Run with coverage report
-npm run test:watch      # Watch mode
+npm test          # 92 assertions against known-good values (Node)
+npm run verify    # compile the vendored C library and diff every method
+                  # against it (96 numeric checks; needs gcc + node)
 ```
 
-**Test Coverage:**
-- ✅ 106 tests passing
-- ✅ 86.1% statement coverage
-- ✅ 66.66% function coverage
-- ✅ All major functionality covered
+**Coverage:**
+- ✅ All **104** wrapped methods are exercised by the test/verify suites
+- ✅ **86** of them are numerically validated against the real Swiss Ephemeris
+  C library (`npm run verify`, tolerance 1e-6)
+- ✅ Verified in both Node and a real browser
+  (`verification/browser_test.html`, served via `npm run demo`)
+
+`npm run verify` compiles the vendored C source with `gcc`, generates a
+reference from the genuine library, and confirms the WebAssembly wrappers
+return identical numbers — this is what guarantees the argument marshaling is
+correct.
 
 ## 📁 Project Structure
 

@@ -611,17 +611,18 @@ async function findNextSolarEclipse(startYear, startMonth, startDay) {
     0 // forward search
   );
 
+  // sol_eclipse_when_glob returns { retFlag, tret } (or null on error).
+  // tret[0] = time of maximum eclipse; retFlag carries the SE_ECL_* type bits.
   if (eclipse) {
-    const eclipseDate = swe.revjul(eclipse[1], swe.SE_GREG_CAL);
+    const eclipseDate = swe.revjul(eclipse.tret[0], swe.SE_GREG_CAL);
 
     swe.close();
 
     return {
-      julianDay: eclipse[1],
+      julianDay: eclipse.tret[0],
       date: eclipseDate,
-      type: eclipse[0] & swe.SE_ECL_TOTAL ? 'Total' :
-            eclipse[0] & swe.SE_ECL_ANNULAR ? 'Annular' : 'Partial',
-      magnitude: eclipse[4]
+      type: eclipse.retFlag & swe.SE_ECL_TOTAL ? 'Total' :
+            eclipse.retFlag & swe.SE_ECL_ANNULAR ? 'Annular' : 'Partial'
     };
   }
 
