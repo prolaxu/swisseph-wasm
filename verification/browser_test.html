@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SwissEph WASM — Browser Verification</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem; background: #111; color: #eee; }
+    h1 { font-size: 1.2rem; }
+    #summary { font-size: 1.1rem; font-weight: 700; padding: .5rem 0; }
+    .ok { color: #4ade80; }
+    .bad { color: #f87171; }
+    pre { background: #1b1b1b; padding: 1rem; border-radius: 6px; overflow: auto; max-height: 60vh; }
+  </style>
+</head>
+<body>
+  <h1>Swiss Ephemeris WASM — in-browser verification</h1>
+  <div id="summary">Running…</div>
+  <pre id="log"></pre>
+
+  <script type="module">
+    import SwissEph from '../src/swisseph.js';
+    import { runChecks } from './checks.js';
+
+    const logEl = document.getElementById('log');
+    const sumEl = document.getElementById('summary');
+    const log = (m) => { logEl.textContent += m + '\n'; };
+
+    (async () => {
+      try {
+        const C = await (await fetch('./c_ref.json')).json();
+        const s = new SwissEph();
+        await s.initSwissEph();
+        log('initSwissEph() OK — swe_version = ' + s.version());
+
+        const { pass, fail, fails } = runChecks(s, C);
+        s.close();
+
+        // Signal completion for automation (window + a global).
+        window.__RESULT__ = { pass, fail, fails };
+
+        sumEl.textContent = `RESULT: PASS ${pass}  FAIL ${fail}`;
+        sumEl.className = fail ? 'bad' : 'ok';
+        if (fails.length) { log('\nMISMATCHES:'); fails.forEach(f => log('  x ' + f)); }
+        else log('\nAll checks matched the C reference.');
+        log('\n__DONE__');
+      } catch (e) {
+        window.__RESULT__ = { error: String(e && e.stack || e) };
+        sumEl.textContent = 'ERROR: ' + (e && e.message || e);
+        sumEl.className = 'bad';
+        log('ERROR: ' + (e && e.stack || e));
+        log('\n__DONE__');
+      }
+    })();
+  </script>
+</body>
+</html>
