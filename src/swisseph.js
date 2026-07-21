@@ -1405,26 +1405,6 @@ class SwissEph {
     );
   }
 
-  houses(julianDay, geoLat, geoLon, houseSystem) {
-    const cuspsPtr = this.SweModule._malloc(13 * 8); // 13 doubles
-    const ascmcPtr = this.SweModule._malloc(10 * 8); // 10 doubles
-    
-    this.SweModule.ccall(
-      'swe_houses',
-      'number',
-      ['number', 'number', 'number', 'string', 'pointer', 'pointer'],
-      [julianDay, geoLat, geoLon, houseSystem, cuspsPtr, ascmcPtr]
-    );
-
-    const cusps = new Float64Array(this.SweModule.HEAPF64.buffer, cuspsPtr, 13).slice();
-    const ascmc = new Float64Array(this.SweModule.HEAPF64.buffer, ascmcPtr, 10).slice();
-    
-    this.SweModule._free(cuspsPtr);
-    this.SweModule._free(ascmcPtr);
-    
-    return { cusps, ascmc };
-  }
-
   azalt(tjd_ut, calc_flag, geopos, atpress, attemp, xin) {
     const xazPtr = this.SweModule._malloc(3 * 8);
     const xinPtr = this.SweModule._malloc(3 * 8);
