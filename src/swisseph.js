@@ -1585,6 +1585,259 @@ class SwissEph {
     return retFlag < 0 ? null : results;
   }
 
+  // Delta T with an explicit ephemeris flag (recommended over deltat()).
+  deltat_ex(julianDay, ephemerisFlag) {
+    const serrPtr = this.SweModule._malloc(256);
+    const result = this.SweModule.ccall(
+      'swe_deltat_ex',
+      'number',
+      ['number', 'number', 'pointer'],
+      [julianDay, ephemerisFlag, serrPtr]
+    );
+    this.SweModule._free(serrPtr);
+    return result;
+  }
+
+  // Name of a house system given its single-letter code (e.g. 'P').
+  house_name(houseSystem) {
+    return this.SweModule.ccall(
+      'swe_house_name',
+      'string',
+      ['number'],
+      [houseSystem.charCodeAt(0)]
+    );
+  }
+
+  // Shared implementation for the single-longitude crossing functions
+  // (swe_solcross / swe_solcross_ut / swe_mooncross / swe_mooncross_ut).
+  #cross(fnName, x2cross, julianDay, flags) {
+    const serrPtr = this.SweModule._malloc(256);
+    const jd = this.SweModule.ccall(
+      fnName,
+      'number',
+      ['number', 'number', 'number', 'pointer'],
+      [x2cross, julianDay, flags, serrPtr]
+    );
+    this.SweModule._free(serrPtr);
+    return jd;
+  }
+
+  // Julian day (ET) when the Sun next crosses ecliptic longitude x2cross.
+  solcross(x2cross, julianDayET, flags) {
+    return this.#cross('swe_solcross', x2cross, julianDayET, flags);
+  }
+
+  // Julian day (UT) when the Sun next crosses ecliptic longitude x2cross.
+  solcross_ut(x2cross, julianDayUT, flags) {
+    return this.#cross('swe_solcross_ut', x2cross, julianDayUT, flags);
+  }
+
+  // Julian day (ET) when the Moon next crosses ecliptic longitude x2cross.
+  mooncross(x2cross, julianDayET, flags) {
+    return this.#cross('swe_mooncross', x2cross, julianDayET, flags);
+  }
+
+  // Julian day (UT) when the Moon next crosses ecliptic longitude x2cross.
+  mooncross_ut(x2cross, julianDayUT, flags) {
+    return this.#cross('swe_mooncross_ut', x2cross, julianDayUT, flags);
+  }
+
+  // Shared implementation for the Moon node-crossing functions.
+  #mooncrossNode(fnName, julianDay, flags) {
+    const xlonPtr = this.SweModule._malloc(8);
+    const xlatPtr = this.SweModule._malloc(8);
+    const serrPtr = this.SweModule._malloc(256);
+    const jd = this.SweModule.ccall(
+      fnName,
+      'number',
+      ['number', 'number', 'pointer', 'pointer', 'pointer'],
+      [julianDay, flags, xlonPtr, xlatPtr, serrPtr]
+    );
+    const HEAPF64 = this.SweModule.HEAPF64;
+    const lon = HEAPF64[xlonPtr >> 3];
+    const lat = HEAPF64[xlatPtr >> 3];
+    this.SweModule._free(xlonPtr);
+    this.SweModule._free(xlatPtr);
+    this.SweModule._free(serrPtr);
+    return { jd, lon, lat };
+  }
+
+  // Julian day (ET) when the Moon next crosses its node, with node position.
+  mooncross_node(julianDayET, flags) {
+    return this.#mooncrossNode('swe_mooncross_node', julianDayET, flags);
+  }
+
+  // Julian day (UT) when the Moon next crosses its node, with node position.
+  mooncross_node_ut(julianDayUT, flags) {
+    return this.#mooncrossNode('swe_mooncross_node_ut', julianDayUT, flags);
+  }
+
+  // Shared implementation for the heliocentric crossing functions.
+  #helioCross(fnName, planet, x2cross, julianDay, flags, direction) {
+    const jdPtr = this.SweModule._malloc(8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
+      fnName,
+      'number',
+      ['number', 'number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [planet, x2cross, julianDay, flags, direction, jdPtr, serrPtr]
+    );
+    const jd = this.SweModule.HEAPF64[jdPtr >> 3];
+    this.SweModule._free(jdPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : jd;
+  }
+
+  // Julian day (ET) when a planet crosses longitude x2cross heliocentrically.
+  helio_cross(planet, x2cross, julianDayET, flags, direction) {
+    return this.#helioCross('swe_helio_cross', planet, x2cross, julianDayET, flags, direction);
+  }
+
+  // Julian day (UT) when a planet crosses longitude x2cross heliocentrically.
+  helio_cross_ut(planet, x2cross, julianDayUT, flags, direction) {
+    return this.#helioCross('swe_helio_cross_ut', planet, x2cross, julianDayUT, flags, direction);
+  }
+
+  // Gauquelin sector position of a planet or star. Returns null on error.
+  gauquelin_sector(t_ut, planet, starname, flags, method, geopos, atpress, attemp) {
+    const name = starname || '';
+    const nameBuf = this.SweModule._malloc(name.length + 1);
+    this.SweModule.stringToUTF8(name, nameBuf, name.length + 1);
+    const geoPtr = this.#allocDoubles(geopos);
+    const dgsectPtr = this.SweModule._malloc(8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
+      'swe_gauquelin_sector',
+      'number',
+      ['number', 'number', 'pointer', 'number', 'number', 'pointer', 'number', 'number', 'pointer', 'pointer'],
+      [t_ut, planet, nameBuf, flags, method, geoPtr, atpress, attemp, dgsectPtr, serrPtr]
+    );
+    const dgsect = this.SweModule.HEAPF64[dgsectPtr >> 3];
+    this.SweModule._free(nameBuf);
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(dgsectPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : dgsect;
+  }
+
+  // Planetocentric position: planet as seen from body `center`. Returns 6
+  // values (like calc) or null on error.
+  calc_pctr(julianDay, planet, center, flags) {
+    const resultPtr = this.SweModule._malloc(6 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
+      'swe_calc_pctr',
+      'number',
+      ['number', 'number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, planet, center, flags, resultPtr, serrPtr]
+    );
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
+    this.SweModule._free(resultPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : results;
+  }
+
+  // Local apparent time -> local mean time. Returns the resulting Julian Day.
+  lat_to_lmt(julianDayLat, geoLon) {
+    const outPtr = this.SweModule._malloc(8);
+    const serrPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall(
+      'swe_lat_to_lmt',
+      'number',
+      ['number', 'number', 'pointer', 'pointer'],
+      [julianDayLat, geoLon, outPtr, serrPtr]
+    );
+    const result = this.SweModule.HEAPF64[outPtr >> 3];
+    this.SweModule._free(outPtr);
+    this.SweModule._free(serrPtr);
+    return result;
+  }
+
+  // Local mean time -> local apparent time. Returns the resulting Julian Day.
+  lmt_to_lat(julianDayLmt, geoLon) {
+    const outPtr = this.SweModule._malloc(8);
+    const serrPtr = this.SweModule._malloc(256);
+    this.SweModule.ccall(
+      'swe_lmt_to_lat',
+      'number',
+      ['number', 'number', 'pointer', 'pointer'],
+      [julianDayLmt, geoLon, outPtr, serrPtr]
+    );
+    const result = this.SweModule.HEAPF64[outPtr >> 3];
+    this.SweModule._free(outPtr);
+    this.SweModule._free(serrPtr);
+    return result;
+  }
+
+  // Path of the loaded Swiss Ephemeris shared library / module.
+  get_library_path() {
+    const bufPtr = this.SweModule._malloc(256);
+    const result = this.SweModule.ccall('swe_get_library_path', 'string', ['pointer'], [bufPtr]);
+    this.SweModule._free(bufPtr);
+    return result;
+  }
+
+  // Metadata of a currently open ephemeris file (0 = planet, 1 = moon, etc.).
+  get_current_file_data(fileIndex) {
+    const startPtr = this.SweModule._malloc(8);
+    const endPtr = this.SweModule._malloc(8);
+    const denumPtr = this.SweModule._malloc(4);
+    const path = this.SweModule.ccall(
+      'swe_get_current_file_data',
+      'string',
+      ['number', 'pointer', 'pointer', 'pointer'],
+      [fileIndex, startPtr, endPtr, denumPtr]
+    );
+    const HEAPF64 = this.SweModule.HEAPF64;
+    const HEAP32 = new Int32Array(this.SweModule.HEAPF64.buffer);
+    const result = {
+      path,
+      start: HEAPF64[startPtr >> 3],
+      end: HEAPF64[endPtr >> 3],
+      denum: HEAP32[denumPtr >> 2],
+    };
+    this.SweModule._free(startPtr);
+    this.SweModule._free(endPtr);
+    this.SweModule._free(denumPtr);
+    return result;
+  }
+
+  // Set a user-defined Delta T (in days). Pass SE_TIDAL_DEFAULT-style values.
+  set_delta_t_userdef(dt) {
+    this.SweModule.ccall('swe_set_delta_t_userdef', 'void', ['number'], [dt]);
+  }
+
+  // Enable/disable interpolation of nutation between tabulated values.
+  set_interpolate_nut(doInterpolate) {
+    this.SweModule.ccall('swe_set_interpolate_nut', 'void', ['number'], [doInterpolate ? 1 : 0]);
+  }
+
+  // Query the astronomical models (precession, nutation, ...) in use.
+  get_astro_models(flags) {
+    const samodPtr = this.SweModule._malloc(256);
+    const sdetPtr = this.SweModule._malloc(256);
+    this.SweModule.stringToUTF8('', samodPtr, 1); // empty input -> report defaults
+    this.SweModule.ccall(
+      'swe_get_astro_models',
+      'void',
+      ['pointer', 'pointer', 'number'],
+      [samodPtr, sdetPtr, flags]
+    );
+    const models = this.SweModule.UTF8ToString(samodPtr);
+    const details = this.SweModule.UTF8ToString(sdetPtr);
+    this.SweModule._free(samodPtr);
+    this.SweModule._free(sdetPtr);
+    return { models, details };
+  }
+
+  // Select astronomical models (precession, nutation, ...).
+  set_astro_models(models, flags) {
+    const buf = this.SweModule._malloc(models.length + 1);
+    this.SweModule.stringToUTF8(models, buf, models.length + 1);
+    this.SweModule.ccall('swe_set_astro_models', 'void', ['pointer', 'number'], [buf, flags]);
+    this.SweModule._free(buf);
+  }
+
 }
 
 export default SwissEph;

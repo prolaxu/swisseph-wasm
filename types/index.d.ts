@@ -516,6 +516,109 @@ declare module 'swisseph-wasm' {
     cs2degstr(t: number): string;
 
     /**
+     * Delta T with an explicit ephemeris flag (recommended over deltat)
+     */
+    deltat_ex(jd: number, ephemerisFlag: number): number;
+
+    /**
+     * Name of a house system given its single-letter code (e.g. 'P')
+     */
+    house_name(hsys: string): string;
+
+    /**
+     * Julian Day (ET) when the Sun next crosses ecliptic longitude x2cross
+     */
+    solcross(x2cross: number, jdET: number, flags: number): number;
+
+    /**
+     * Julian Day (UT) when the Sun next crosses ecliptic longitude x2cross
+     */
+    solcross_ut(x2cross: number, jdUT: number, flags: number): number;
+
+    /**
+     * Julian Day (ET) when the Moon next crosses ecliptic longitude x2cross
+     */
+    mooncross(x2cross: number, jdET: number, flags: number): number;
+
+    /**
+     * Julian Day (UT) when the Moon next crosses ecliptic longitude x2cross
+     */
+    mooncross_ut(x2cross: number, jdUT: number, flags: number): number;
+
+    /**
+     * Julian Day (ET) when the Moon next crosses its node, with node position
+     */
+    mooncross_node(jdET: number, flags: number): MoonNodeCrossing;
+
+    /**
+     * Julian Day (UT) when the Moon next crosses its node, with node position
+     */
+    mooncross_node_ut(jdUT: number, flags: number): MoonNodeCrossing;
+
+    /**
+     * Julian Day (ET) when a planet crosses longitude x2cross heliocentrically.
+     * Returns null on error.
+     */
+    helio_cross(planet: number, x2cross: number, jdET: number, flags: number, direction: number): number | null;
+
+    /**
+     * Julian Day (UT) when a planet crosses longitude x2cross heliocentrically.
+     * Returns null on error.
+     */
+    helio_cross_ut(planet: number, x2cross: number, jdUT: number, flags: number, direction: number): number | null;
+
+    /**
+     * Gauquelin sector position of a planet or star. Returns null on error.
+     */
+    gauquelin_sector(t_ut: number, planet: number, starname: string, flags: number, method: number, geopos: number[], atpress: number, attemp: number): number | null;
+
+    /**
+     * Planetocentric position: planet as seen from body `center`. Returns 6
+     * values (longitude, latitude, distance, and their speeds) or null on error.
+     */
+    calc_pctr(jd: number, planet: number, center: number, flags: number): Float64Array | null;
+
+    /**
+     * Local apparent time to local mean time. Returns the resulting Julian Day.
+     */
+    lat_to_lmt(jdLat: number, geolon: number): number;
+
+    /**
+     * Local mean time to local apparent time. Returns the resulting Julian Day.
+     */
+    lmt_to_lat(jdLmt: number, geolon: number): number;
+
+    /**
+     * Path of the loaded Swiss Ephemeris library/module
+     */
+    get_library_path(): string;
+
+    /**
+     * Metadata of a currently open ephemeris file (0 = planets, 1 = moon, ...)
+     */
+    get_current_file_data(fileIndex: number): CurrentFileData;
+
+    /**
+     * Set a user-defined Delta T value (in days)
+     */
+    set_delta_t_userdef(dt: number): void;
+
+    /**
+     * Enable or disable interpolation of nutation between tabulated values
+     */
+    set_interpolate_nut(doInterpolate: boolean): void;
+
+    /**
+     * Query the astronomical models (precession, nutation, ...) currently in use
+     */
+    get_astro_models(flags: number): AstroModels;
+
+    /**
+     * Select astronomical models (precession, nutation, ...)
+     */
+    set_astro_models(models: string, flags: number): void;
+
+    /**
      * Close Swiss Ephemeris and free memory
      */
     close(): void;
@@ -598,6 +701,33 @@ declare module 'swisseph-wasm' {
     hour: number;
     minute: number;
     second: number;
+  }
+
+  /**
+   * Ephemeris file metadata from get_current_file_data
+   */
+  export interface CurrentFileData {
+    path: string;
+    start: number;
+    end: number;
+    denum: number;
+  }
+
+  /**
+   * Astronomical model strings from get_astro_models
+   */
+  export interface AstroModels {
+    models: string;
+    details: string;
+  }
+
+  /**
+   * Moon node-crossing result from mooncross_node / mooncross_node_ut
+   */
+  export interface MoonNodeCrossing {
+    jd: number;
+    lon: number;
+    lat: number;
   }
 
   /**
