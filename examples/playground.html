@@ -116,10 +116,10 @@ const KL=['AK','AmK','BK','MK','PiK','PK','GK','DK'];
 const kb=[['Sun',sunL],['Moon',moonL],['Mars',sid(swisseph.SE_MARS)],['Mercury',sid(swisseph.SE_MERCURY)],['Jupiter',sid(swisseph.SE_JUPITER)],['Venus',sid(swisseph.SE_VENUS)],['Saturn',sid(swisseph.SE_SATURN)],['Rahu',rahu]];
 kb.map(([n,l])=>[n, n==='Rahu'?30-(l%30):l%30]).sort((x,y)=>y[1]-x[1]).forEach(([n],i)=>print(KL[i].padEnd(4)+' '+n));
 
-print('\n--- Swiss Ephemeris provides the above (positions, Lagna, ayanamsa,');
-print('sidereal time, rise/set). Dasas, divisional charts (D-1..D-144),');
-print('Ashtakavarga, Shadbala, Vimshopaka and avasthas are separate jyotish');
-print('computations layered on top of these ephemeris values.');
+// print('\n--- Swiss Ephemeris provides the above (positions, Lagna, ayanamsa,');
+// print('sidereal time, rise/set). Dasas, divisional charts (D-1..D-144),');
+// print('Ashtakavarga, Shadbala, Vimshopaka and avasthas are separate jyotish');
+// print('computations layered on top of these ephemeris values.');
 </script>
 
   <!-- Monaco editor (AMD loader from CDN). -->
