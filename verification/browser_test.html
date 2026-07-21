@@ -27,7 +27,7 @@
 
     (async () => {
       try {
-        const C = await (await fetch('./c_ref.json')).json();
+        const C = await (await fetch('./reference.json')).json();
         const s = new SwissEph();
         await s.initSwissEph();
         log('initSwissEph() OK — swe_version = ' + s.version());

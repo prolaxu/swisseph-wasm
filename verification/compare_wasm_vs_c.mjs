@@ -2,7 +2,7 @@ import SwissEph from '../src/swisseph.js';
 import { readFileSync } from 'fs';
 import { runChecks } from './checks.js';
 
-const C = JSON.parse(readFileSync('./verification/c_ref.json', 'utf8'));
+const C = JSON.parse(readFileSync('./verification/reference.json', 'utf8'));
 
 const s = new SwissEph();
 await s.initSwissEph();

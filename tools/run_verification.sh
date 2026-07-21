@@ -7,9 +7,14 @@
 #
 #   1. Compile the vendored C source (deps/swisseph) natively with gcc into a
 #      reference generator.
-#   2. Run it against the bundled ephemeris data to emit verification/c_ref.json.
+#   2. Run it against the bundled ephemeris data to (re)generate the committed
+#      verification/reference.json.
 #   3. Run every wrapped JS(wasm) method with identical inputs and diff against
-#      that C reference (verification/compare_wasm_vs_c.mjs).
+#      that reference (verification/compare_wasm_vs_c.mjs).
+#
+# reference.json is committed, so npm test and the browser harness work without
+# a C toolchain. Regenerating it here is byte-identical unless the vendored C
+# source changes — in which case the git diff on reference.json is the signal.
 #
 # Requires: gcc, node. (emcc is NOT needed - this checks the JS wrappers'
 # argument marshaling against C, independent of how wasm was built.)
@@ -28,10 +33,10 @@ gcc -O2 -w -o verification/swegen \
   verification/generate_all_outputs.c \
   $(ls deps/swisseph/*.c | grep -v swevents.c | tr '\n' ' ') -lm
 
-info "Running C reference (ephemeris data = deps/sweph)..."
-SE_EPHE_PATH="$(pwd)/deps/sweph" verification/swegen > verification/c_ref.json
+info "Regenerating verification/reference.json (ephemeris data = deps/sweph)..."
+SE_EPHE_PATH="$(pwd)/deps/sweph" verification/swegen > verification/reference.json
 
-info "Comparing JS(wasm) output against the C reference..."
+info "Comparing JS(wasm) output against the reference..."
 node verification/compare_wasm_vs_c.mjs
 
 info "Verification complete."

@@ -39,7 +39,7 @@ async function runTests() {
   const swisseph = new SwissEph();
   await swisseph.initSwissEph();
   
-  const cOutputs = JSON.parse(readFileSync('./verification/all_outputs.json', 'utf8'));
+  const cOutputs = JSON.parse(readFileSync('./verification/reference.json', 'utf8'));
   
   console.log('📅 Date/Time Functions (12 methods)');
   assertClose(swisseph.julday(2000, 1, 1, 12.0), cOutputs.date_time.julday, 'julday');
