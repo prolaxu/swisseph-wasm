@@ -331,6 +331,17 @@ class SwissEph {
     return this.#module;
   }
 
+  // Allocate a heap buffer and copy a JS array of doubles into it. Returns the
+  // pointer; caller is responsible for _free().
+  #allocDoubles(values) {
+    const ptr = this.SweModule._malloc(values.length * 8);
+    const base = ptr >> 3;
+    for (let i = 0; i < values.length; i++) {
+      this.SweModule.HEAPF64[base + i] = values[i];
+    }
+    return ptr;
+  }
+
   // Initializes the Swiss Ephemeris WebAssembly module
   async initSwissEph() {
     let moduleConfig = {};
@@ -651,7 +662,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [year, month, day, hour, minute, second, gregflag, resultPtr]
     );
-    const result = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 2);
+    const result = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 2).slice();
     this.SweModule._free(resultPtr);
     return {
       julianDayET: result[0],
@@ -816,7 +827,7 @@ class SwissEph {
       ['pointer', 'number', 'number', 'pointer'],
       [starBuffer, julianDay, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -832,7 +843,7 @@ class SwissEph {
       ['pointer', 'number', 'number', 'pointer'],
       [starBuffer, julianDay, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -864,7 +875,7 @@ class SwissEph {
       ['pointer', 'number', 'number', 'pointer'],
       [starBuffer, julianDay, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -880,7 +891,7 @@ class SwissEph {
       ['pointer', 'number', 'number', 'pointer'],
       [starBuffer, julianDay, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 6).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -1075,48 +1086,114 @@ class SwissEph {
   }
 
   get_orbital_elements(julianDay, planet, flags) {
-    return this.SweModule.ccall(
+    const dretPtr = this.SweModule._malloc(50 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
       'swe_get_orbital_elements',
       'number',
-      ['number', 'number', 'number'],
-      [julianDay, planet, flags]
+      ['number', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, planet, flags, dretPtr, serrPtr]
     );
+    const elements = new Float64Array(this.SweModule.HEAPF64.buffer, dretPtr, 50).slice();
+    this.SweModule._free(dretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : elements;
   }
 
   orbit_max_min_true_distance(julianDay, planet, flags) {
-    return this.SweModule.ccall(
+    const dmaxPtr = this.SweModule._malloc(8);
+    const dminPtr = this.SweModule._malloc(8);
+    const dtruePtr = this.SweModule._malloc(8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
       'swe_orbit_max_min_true_distance',
       'number',
-      ['number', 'number', 'number'],
-      [julianDay, planet, flags]
+      ['number', 'number', 'number', 'pointer', 'pointer', 'pointer', 'pointer'],
+      [julianDay, planet, flags, dmaxPtr, dminPtr, dtruePtr, serrPtr]
     );
+    const HEAPF64 = this.SweModule.HEAPF64;
+    const result = {
+      maxDistance: HEAPF64[dmaxPtr >> 3],
+      minDistance: HEAPF64[dminPtr >> 3],
+      trueDistance: HEAPF64[dtruePtr >> 3],
+    };
+    this.SweModule._free(dmaxPtr);
+    this.SweModule._free(dminPtr);
+    this.SweModule._free(dtruePtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : result;
   }
 
   heliacal_ut(julianDayStart, geoPos, atmosData, observerData, objectName, eventType, flags) {
-    return this.SweModule.ccall(
+    const geoPtr = this.#allocDoubles(geoPos);
+    const atmPtr = this.#allocDoubles(atmosData);
+    const obsPtr = this.#allocDoubles(observerData);
+    const namePtr = this.SweModule._malloc(objectName.length + 1);
+    this.SweModule.stringToUTF8(objectName, namePtr, objectName.length + 1);
+    const dretPtr = this.SweModule._malloc(50 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
       'swe_heliacal_ut',
       'number',
-      ['number', 'array', 'array', 'array', 'string', 'number', 'number'],
-      [julianDayStart, geoPos, atmosData, observerData, objectName, eventType, flags]
+      ['number', 'pointer', 'pointer', 'pointer', 'pointer', 'number', 'number', 'pointer', 'pointer'],
+      [julianDayStart, geoPtr, atmPtr, obsPtr, namePtr, eventType, flags, dretPtr, serrPtr]
     );
+    const dret = new Float64Array(this.SweModule.HEAPF64.buffer, dretPtr, 50).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(atmPtr);
+    this.SweModule._free(obsPtr);
+    this.SweModule._free(namePtr);
+    this.SweModule._free(dretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : dret;
   }
 
   heliacal_pheno_ut(julianDay, geoPos, atmosData, observerData, objectName, eventType, heliacalFlag) {
-    return this.SweModule.ccall(
+    const geoPtr = this.#allocDoubles(geoPos);
+    const atmPtr = this.#allocDoubles(atmosData);
+    const obsPtr = this.#allocDoubles(observerData);
+    const namePtr = this.SweModule._malloc(objectName.length + 1);
+    this.SweModule.stringToUTF8(objectName, namePtr, objectName.length + 1);
+    const darrPtr = this.SweModule._malloc(50 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
       'swe_heliacal_pheno_ut',
       'number',
-      ['number', 'array', 'array', 'array', 'string', 'number', 'number'],
-      [julianDay, geoPos, atmosData, observerData, objectName, eventType, heliacalFlag]
+      ['number', 'pointer', 'pointer', 'pointer', 'pointer', 'number', 'number', 'pointer', 'pointer'],
+      [julianDay, geoPtr, atmPtr, obsPtr, namePtr, eventType, heliacalFlag, darrPtr, serrPtr]
     );
+    const darr = new Float64Array(this.SweModule.HEAPF64.buffer, darrPtr, 50).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(atmPtr);
+    this.SweModule._free(obsPtr);
+    this.SweModule._free(namePtr);
+    this.SweModule._free(darrPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : darr;
   }
 
   vis_limit_mag(julianDay, geoPos, atmosData, observerData, objectName, heliacalFlag) {
-    return this.SweModule.ccall(
+    const geoPtr = this.#allocDoubles(geoPos);
+    const atmPtr = this.#allocDoubles(atmosData);
+    const obsPtr = this.#allocDoubles(observerData);
+    const namePtr = this.SweModule._malloc(objectName.length + 1);
+    this.SweModule.stringToUTF8(objectName, namePtr, objectName.length + 1);
+    const dretPtr = this.SweModule._malloc(10 * 8);
+    const serrPtr = this.SweModule._malloc(256);
+    const retFlag = this.SweModule.ccall(
       'swe_vis_limit_mag',
       'number',
-      ['number', 'array', 'array', 'array', 'string', 'number'],
-      [julianDay, geoPos, atmosData, observerData, objectName, heliacalFlag]
+      ['number', 'pointer', 'pointer', 'pointer', 'pointer', 'number', 'pointer', 'pointer'],
+      [julianDay, geoPtr, atmPtr, obsPtr, namePtr, heliacalFlag, dretPtr, serrPtr]
     );
+    const dret = new Float64Array(this.SweModule.HEAPF64.buffer, dretPtr, 10).slice();
+    this.SweModule._free(geoPtr);
+    this.SweModule._free(atmPtr);
+    this.SweModule._free(obsPtr);
+    this.SweModule._free(namePtr);
+    this.SweModule._free(dretPtr);
+    this.SweModule._free(serrPtr);
+    return retFlag < 0 ? null : dret;
   }
 
   houses(julianDay, geoLat, geoLon, houseSystem) {
@@ -1227,7 +1304,7 @@ class SwissEph {
       ['number', 'number', 'pointer'],
       [julianDay, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1242,7 +1319,7 @@ class SwissEph {
       ['number', 'number', 'pointer', 'number', 'pointer'],
       [julianDay, planet, starBuffer, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -1256,7 +1333,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDay, flags, longitude, latitude, altitude, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1269,7 +1346,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDayStart, flags, longitude, latitude, altitude, backward, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1284,7 +1361,7 @@ class SwissEph {
       ['number', 'number', 'pointer', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDayStart, planet, starBuffer, flags, longitude, latitude, altitude, backward, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -1298,7 +1375,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'pointer'],
       [julianDayStart, flags, eclipseType, backward, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1313,7 +1390,7 @@ class SwissEph {
       ['number', 'number', 'pointer', 'number', 'number', 'number', 'pointer'],
       [julianDayStart, planet, starBuffer, flags, eclipseType, backward, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(starBuffer);
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
@@ -1327,7 +1404,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDay, flags, longitude, latitude, altitude, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1340,7 +1417,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'pointer'],
       [julianDayStart, flags, eclipseType, backward, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1353,7 +1430,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDayStart, flags, longitude, latitude, altitude, backward, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1366,7 +1443,7 @@ class SwissEph {
       ['number', 'number', 'number', 'pointer'],
       [julianDay, planet, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1379,7 +1456,7 @@ class SwissEph {
       ['number', 'number', 'number', 'pointer'],
       [julianDay, planet, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 8).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1392,7 +1469,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDay, geoLat, geoLon, altitude, pressure, temperature, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1405,7 +1482,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDay, geoLat, geoLon, altitude, pressure, temperature, distance, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1497,7 +1574,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDay, planet, longitude, latitude, altitude, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
@@ -1510,7 +1587,7 @@ class SwissEph {
       ['number', 'number', 'number', 'number', 'number', 'number', 'pointer'],
       [julianDay, planet, longitude, latitude, altitude, flags, resultPtr]
     );
-    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4);
+    const results = new Float64Array(this.SweModule.HEAPF64.buffer, resultPtr, 4).slice();
     this.SweModule._free(resultPtr);
     return retFlag < 0 ? null : results;
   }
