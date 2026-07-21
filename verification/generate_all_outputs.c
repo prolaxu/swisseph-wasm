@@ -276,6 +276,50 @@ int main() {
 
     printf("  }"); print_comma();
 
+    // === Events (rise/set, eclipses, orbital, _ut crossings) ===
+    printf("  \"events\": {\n");
+
+    double ev_tret[10];
+    int32 rt_ret = swe_rise_trans(2451545.0, SE_SUN, NULL, SEFLG_SWIEPH, SE_CALC_RISE, geopos, 1013.25, 15.0, ev_tret, serr);
+    printf("    \"rise_trans\": {\"retval\": %d, \"tret\": %.15f}", rt_ret, ev_tret[0]); print_comma();
+
+    double sol_tret[10];
+    int32 seg_ret = swe_sol_eclipse_when_glob(2451545.0, SEFLG_SWIEPH, 0, sol_tret, 0, serr);
+    printf("    \"sol_eclipse_when_glob\": {\"retval\": %d, \"tret\": %.15f}", seg_ret, sol_tret[0]); print_comma();
+
+    double lun_tret[10];
+    int32 leg_ret = swe_lun_eclipse_when(2451545.0, SEFLG_SWIEPH, 0, lun_tret, 0, serr);
+    printf("    \"lun_eclipse_when\": {\"retval\": %d, \"tret\": %.15f}", leg_ret, lun_tret[0]); print_comma();
+
+    double ew_geopos[10], ew_attr[20];
+    swe_sol_eclipse_where(sol_tret[0], SEFLG_SWIEPH, ew_geopos, ew_attr, serr);
+    printf("    \"sol_eclipse_where\": {\"lon\": %.15f, \"lat\": %.15f}", ew_geopos[0], ew_geopos[1]); print_comma();
+
+    double eh_attr[20];
+    swe_lun_eclipse_how(lun_tret[0], SEFLG_SWIEPH, geopos, eh_attr, serr);
+    printf("    \"lun_eclipse_how\": {\"umbral_mag\": %.15f}", eh_attr[0]); print_comma();
+
+    double oe[50];
+    swe_get_orbital_elements(2451545.0, SE_MARS, SEFLG_SWIEPH, oe, serr);
+    printf("    \"get_orbital_elements\": %.15f", oe[0]); print_comma();
+
+    double omax, omin, otrue;
+    swe_orbit_max_min_true_distance(2451545.0, SE_MARS, SEFLG_SWIEPH, &omax, &omin, &otrue, serr);
+    printf("    \"orbit_max_min\": %.15f", omax); print_comma();
+
+    printf("    \"solcross_ut\": %.15f", swe_solcross_ut(0.0, 2451545.0, SEFLG_SWIEPH, serr)); print_comma();
+    printf("    \"mooncross_ut\": %.15f", swe_mooncross_ut(0.0, 2451545.0, SEFLG_SWIEPH, serr)); print_comma();
+
+    double mcnu_xlon, mcnu_xlat;
+    double mcnu_jd = swe_mooncross_node_ut(2451545.0, SEFLG_SWIEPH, &mcnu_xlon, &mcnu_xlat, serr);
+    printf("    \"mooncross_node_ut\": %.15f", mcnu_jd); print_comma();
+
+    double hcu_jd;
+    swe_helio_cross_ut(SE_MARS, 0.0, 2451545.0, SEFLG_SWIEPH, 1, &hcu_jd, serr);
+    printf("    \"helio_cross_ut\": %.15f\n", hcu_jd);
+
+    printf("  }"); print_comma();
+
     // === String Formatting ===
     printf("  \"strings\": {\n");
     

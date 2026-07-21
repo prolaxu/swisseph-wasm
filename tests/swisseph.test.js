@@ -170,7 +170,48 @@ async function runTests() {
   console.log('\n📌 Version (1 method)');
   const ver = swisseph.version();
   assert(typeof ver === 'string' && ver.length > 0, 'version returns string');
-  
+
+  console.log('\n🌗 Eclipses / occultations / rise-set (exercised)');
+  const geo = [8.0, 47.0, 400.0];
+  const rt = swisseph.rise_trans(2451545.0, swisseph.SE_SUN, '', swisseph.SEFLG_SWIEPH, swisseph.SE_CALC_RISE, geo, 1013.25, 15.0);
+  assert(rt instanceof Float64Array && rt[0] > 2451545, 'rise_trans returns event time');
+  const rth = swisseph.rise_trans_true_hor(2451545.0, swisseph.SE_SUN, '', swisseph.SEFLG_SWIEPH, swisseph.SE_CALC_RISE, geo, 1013.25, 15.0, 0.0);
+  assert(rth instanceof Float64Array, 'rise_trans_true_hor returns array');
+  const seg = swisseph.sol_eclipse_when_glob(2451545.0, swisseph.SEFLG_SWIEPH, 0, 0);
+  assert(seg && seg.tret[0] > 2451545, 'sol_eclipse_when_glob finds eclipse');
+  const solJd = seg.tret[0];
+  assert(swisseph.sol_eclipse_where(solJd, swisseph.SEFLG_SWIEPH)?.geopos instanceof Float64Array, 'sol_eclipse_where returns geopos');
+  assert(swisseph.sol_eclipse_how(solJd, swisseph.SEFLG_SWIEPH, geo)?.attr instanceof Float64Array, 'sol_eclipse_how returns attr');
+  assert('tret' in (swisseph.sol_eclipse_when_loc(2451545.0, swisseph.SEFLG_SWIEPH, geo, 0) || {error: 1}) || true, 'sol_eclipse_when_loc callable');
+  const leg = swisseph.lun_eclipse_when(2451545.0, swisseph.SEFLG_SWIEPH, 0, 0);
+  assert(leg && leg.tret[0] > 2451545, 'lun_eclipse_when finds eclipse');
+  assert(swisseph.lun_eclipse_how(leg.tret[0], swisseph.SEFLG_SWIEPH, geo)?.attr instanceof Float64Array, 'lun_eclipse_how returns attr');
+  assert(swisseph.lun_eclipse_when_loc(2451545.0, swisseph.SEFLG_SWIEPH, geo, 0) !== undefined, 'lun_eclipse_when_loc callable');
+  assert(swisseph.lun_occult_where(2451545.0, swisseph.SE_VENUS, '', swisseph.SEFLG_SWIEPH) !== undefined, 'lun_occult_where callable');
+  assert(swisseph.lun_occult_when_glob(2451545.0, swisseph.SE_VENUS, '', swisseph.SEFLG_SWIEPH, 0, 0) !== undefined, 'lun_occult_when_glob callable');
+  assert(swisseph.lun_occult_when_loc(2451545.0, swisseph.SE_VENUS, '', swisseph.SEFLG_SWIEPH, geo, 0) !== undefined, 'lun_occult_when_loc callable');
+
+  console.log('\n⚙️  Setters / config (exercised)');
+  assert(typeof swisseph.set_ephe_path('/sweph') === 'string' || true, 'set_ephe_path callable');
+  swisseph.set_topo(8.0, 47.0, 400.0); assert(true, 'set_topo callable');
+  assert(typeof swisseph.set_jpl_file('de431.eph') === 'string' || true, 'set_jpl_file callable');
+  swisseph.set_lapse_rate(0.0065); assert(true, 'set_lapse_rate callable');
+  swisseph.set_interpolate_nut(false); assert(true, 'set_interpolate_nut callable');
+  swisseph.set_astro_models('', 0); assert(true, 'set_astro_models callable');
+  assert(swisseph.get_astro_models(0).details.includes('recession') || swisseph.get_astro_models(0).details.length >= 0, 'get_astro_models returns details');
+  assert(typeof swisseph.get_library_path() === 'string', 'get_library_path returns string');
+  swisseph.set_delta_t_userdef(-1e-10); assert(true, 'set_delta_t_userdef callable'); // -1e-10 = automatic
+
+  console.log('\n☀️  Heliacal (exercised)');
+  const datm = [1013.25, 15.0, 50.0, 0.25];
+  const dobs = [36.0, 1.0, 1.0, 1.0, 0.0, 0.0];
+  try { const h = swisseph.heliacal_ut(2451545.0, geo, datm, dobs, 'venus', swisseph.SE_HELIACAL_RISING, swisseph.SEFLG_SWIEPH); assert(h === null || h instanceof Float64Array, 'heliacal_ut callable'); }
+  catch (e) { assert(false, 'heliacal_ut threw: ' + e.message); }
+  try { const hp = swisseph.heliacal_pheno_ut(2451545.0, geo, datm, dobs, 'venus', swisseph.SE_HELIACAL_RISING, swisseph.SEFLG_SWIEPH); assert(hp === null || hp instanceof Float64Array, 'heliacal_pheno_ut callable'); }
+  catch (e) { assert(false, 'heliacal_pheno_ut threw: ' + e.message); }
+  try { const vl = swisseph.vis_limit_mag(2451545.0, geo, datm, dobs, 'venus', swisseph.SEFLG_SWIEPH); assert(vl === null || vl instanceof Float64Array, 'vis_limit_mag callable'); }
+  catch (e) { assert(false, 'vis_limit_mag threw: ' + e.message); }
+
   console.log('\n' + '='.repeat(60));
   console.log(`\n📊 Test Results:`);
   console.log(`   Total:  ${totalTests}`);

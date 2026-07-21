@@ -129,6 +129,20 @@ const fd = s.get_current_file_data(0);
 chk('get_current_file_data.denum', fd.denum, mi.get_current_file_data.denum);
 chk('get_current_file_data.start', fd.start, mi.get_current_file_data.start);
 
+// events (rise/set, eclipses, orbital, _ut crossings)
+const ev = C.events;
+chk('rise_trans.tret', s.rise_trans(2451545.0, s.SE_SUN, '', s.SEFLG_SWIEPH, s.SE_CALC_RISE, [8.0,47.0,400.0], 1013.25, 15.0)?.[0], ev.rise_trans.tret);
+chk('sol_eclipse_when_glob.tret', s.sol_eclipse_when_glob(2451545.0, s.SEFLG_SWIEPH, 0, 0)?.tret[0], ev.sol_eclipse_when_glob.tret);
+chk('lun_eclipse_when.tret', s.lun_eclipse_when(2451545.0, s.SEFLG_SWIEPH, 0, 0)?.tret[0], ev.lun_eclipse_when.tret);
+chk('sol_eclipse_where.lon', s.sol_eclipse_where(ev.sol_eclipse_when_glob.tret, s.SEFLG_SWIEPH)?.geopos[0], ev.sol_eclipse_where.lon);
+chk('lun_eclipse_how.umbral', s.lun_eclipse_how(ev.lun_eclipse_when.tret, s.SEFLG_SWIEPH, [8.0,47.0,400.0])?.attr[0], ev.lun_eclipse_how.umbral_mag);
+chk('get_orbital_elements', s.get_orbital_elements(2451545.0, s.SE_MARS, s.SEFLG_SWIEPH)?.[0], ev.get_orbital_elements);
+chk('orbit_max_min', s.orbit_max_min_true_distance(2451545.0, s.SE_MARS, s.SEFLG_SWIEPH)?.maxDistance, ev.orbit_max_min);
+chk('solcross_ut', s.solcross_ut(0.0, 2451545.0, s.SEFLG_SWIEPH), ev.solcross_ut);
+chk('mooncross_ut', s.mooncross_ut(0.0, 2451545.0, s.SEFLG_SWIEPH), ev.mooncross_ut);
+chk('mooncross_node_ut.jd', s.mooncross_node_ut(2451545.0, s.SEFLG_SWIEPH).jd, ev.mooncross_node_ut);
+chk('helio_cross_ut', s.helio_cross_ut(s.SE_MARS, 0.0, 2451545.0, s.SEFLG_SWIEPH, 1), ev.helio_cross_ut);
+
 // strings
 chk('cs2timestr', s.cs2timestr(12.5,' ',true), C.strings.cs2timestr);
 chk('cs2lonlatstr', s.cs2lonlatstr(123.456,'E','W'), C.strings.cs2lonlatstr);
