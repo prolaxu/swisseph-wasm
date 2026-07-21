@@ -320,3 +320,7 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Verification build artifacts
+verification/swegen
+verification/c_ref.json

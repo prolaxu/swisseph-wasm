@@ -1,0 +1,123 @@
+import SwissEph from '../src/swisseph.js';
+import { readFileSync } from 'fs';
+
+const C = JSON.parse(readFileSync('./verification/c_ref.json', 'utf8'));
+const TOL = 1e-6;
+let pass = 0, fail = 0;
+const fails = [];
+
+function chk(name, got, exp) {
+  let ok;
+  if (typeof exp === 'number') ok = Number.isFinite(got) && Math.abs(got - exp) < TOL;
+  else if (typeof exp === 'string') ok = String(got).includes(exp) || got === exp;
+  else ok = got === exp;
+  if (ok) { pass++; }
+  else { fail++; fails.push(`${name}: got=${JSON.stringify(got)} exp=${JSON.stringify(exp)}`); }
+}
+
+const s = new SwissEph();
+await s.initSwissEph();
+
+// date_time
+const dt = C.date_time;
+chk('julday', s.julday(2000,1,1,12.0), dt.julday);
+const rj = s.revjul(2451545.0,1);
+chk('revjul.year', rj.year, dt.revjul.year); chk('revjul.hour', rj.hour, dt.revjul.hour);
+chk('date_conversion', s.date_conversion(2000,1,1,12.0,'g'), dt.date_conversion.jd);
+const uj = s.utc_to_jd(2000,1,1,12,0,0,1);
+chk('utc_to_jd.et', uj.julianDayET, dt.utc_to_jd.et); chk('utc_to_jd.ut', uj.julianDayUT, dt.utc_to_jd.ut);
+chk('jdet_to_utc.year', s.jdet_to_utc(2451545.0,1).year, dt.jdet_to_utc.year);
+chk('jdut1_to_utc.year', s.jdut1_to_utc(2451545.0,1).year, dt.jdut1_to_utc.year);
+const tz = s.utc_time_zone(2000,1,1,12,0,0,1.0);
+chk('utc_time_zone.year', tz.year, dt.utc_time_zone.year); chk('utc_time_zone.hour', tz.hour, dt.utc_time_zone.hour);
+chk('deltat', s.deltat(2451545.0), dt.deltat);
+chk('time_equ', s.time_equ(2451545.0), dt.time_equ);
+chk('sidtime', s.sidtime(2451545.0), dt.sidtime);
+chk('sidtime0', s.sidtime0(2451545.0,23.44,0), dt.sidtime0);
+chk('day_of_week', s.day_of_week(2451545.0), dt.day_of_week);
+
+// planets
+const c = s.calc(2451545.0, s.SE_SUN, s.SEFLG_SWIEPH);
+chk('calc.lon', c.longitude, C.planets.calc_sun.lon); chk('calc.lat', c.latitude, C.planets.calc_sun.lat);
+const cu = s.calc_ut(2451545.0, s.SE_MOON, s.SEFLG_SWIEPH);
+chk('calc_ut.lon', cu[0], C.planets.calc_ut_moon.lon); chk('calc_ut.lat', cu[1], C.planets.calc_ut_moon.lat);
+chk('get_planet_name', s.get_planet_name(s.SE_SUN), C.planets.get_planet_name);
+
+// stars
+chk('fixstar.lon', s.fixstar('Sirius',2451545.0,s.SEFLG_SWIEPH)?.[0], C.stars.fixstar.lon);
+chk('fixstar_ut.lon', s.fixstar_ut('Sirius',2451545.0,s.SEFLG_SWIEPH)?.[0], C.stars.fixstar_ut.lon);
+chk('fixstar_mag', s.fixstar_mag('Sirius'), C.stars.fixstar_mag.mag);
+chk('fixstar2.lon', s.fixstar2('Sirius',2451545.0,s.SEFLG_SWIEPH)?.[0], C.stars.fixstar2.lon);
+chk('fixstar2_ut.lon', s.fixstar2_ut('Sirius',2451545.0,s.SEFLG_SWIEPH)?.[0], C.stars.fixstar2_ut.lon);
+chk('fixstar2_mag', s.fixstar2_mag('Sirius'), C.stars.fixstar2_mag.mag);
+
+// houses
+const h = s.houses(2451545.0,47.0,8.0,'P');
+chk('houses.cusp1', h.cusps[1], C.houses.houses.cusp1); chk('houses.asc', h.ascmc[0], C.houses.houses.asc);
+chk('houses_ex.cusp1', s.houses_ex(2451545.0,s.SEFLG_SWIEPH,47.0,8.0,'P').cusps[1], C.houses.houses_ex.cusp1);
+chk('houses_ex2.cusp1', s.houses_ex2(2451545.0,s.SEFLG_SWIEPH,47.0,8.0,'P').cusps[1], C.houses.houses_ex2.cusp1);
+chk('houses_armc.cusp1', s.houses_armc(12.0,47.0,23.44,'P').cusps[1], C.houses.houses_armc.cusp1);
+chk('houses_armc_ex2.cusp1', s.houses_armc_ex2(12.0,47.0,23.44,'P').cusps[1], C.houses.houses_armc_ex2.cusp1);
+chk('house_pos', s.house_pos(12.0,47.0,23.44,'P',100.0,0.0), C.houses.house_pos);
+
+// math
+const m = C.math;
+chk('degnorm', s.degnorm(370.0), m.degnorm);
+chk('radnorm', s.radnorm(2*Math.PI+0.1), m.radnorm);
+chk('rad_midp', s.rad_midp(0.1,6.2), m.rad_midp);
+chk('deg_midp', s.deg_midp(10.0,350.0), m.deg_midp);
+const sd = s.split_deg(123.456, s.SE_SPLIT_DEG_ROUND_SEC);
+chk('split_deg.deg', sd.degree, m.split_deg.deg); chk('split_deg.min', sd.min, m.split_deg.min); chk('split_deg.sec', sd.second, m.split_deg.sec);
+chk('csnorm', s.csnorm(370.0), m.csnorm);
+chk('difcsn', s.difcsn(10.0,350.0), m.difcsn);
+chk('difdegn', s.difdegn(10.0,350.0), m.difdegn);
+chk('difcs2n', s.difcs2n(10.0,350.0), m.difcs2n);
+chk('difdeg2n', s.difdeg2n(10.0,350.0), m.difdeg2n);
+chk('difrad2n', s.difrad2n(0.1,6.2), m.difrad2n);
+chk('csroundsec', s.csroundsec(123.456789), m.csroundsec);
+chk('d2l', s.d2l(123.456), m.d2l);
+
+// transforms
+const ct = s.cotrans([10.0,0.0,1.0],23.44);
+chk('cotrans.x', ct[0], C.transforms.cotrans.x); chk('cotrans.y', ct[1], C.transforms.cotrans.y);
+const cts = s.cotrans_sp([10.0,0.0,1.0,0.1,0.0,0.0],23.44);
+chk('cotrans_sp.x', cts[0], C.transforms.cotrans_sp.x); chk('cotrans_sp.y', cts[1], C.transforms.cotrans_sp.y);
+
+// ayanamsa
+s.set_sid_mode(s.SE_SIDM_LAHIRI,0,0);
+chk('get_ayanamsa', s.get_ayanamsa(2451545.0), C.ayanamsa.get_ayanamsa);
+chk('get_ayanamsa_ut', s.get_ayanamsa_ut(2451545.0), C.ayanamsa.get_ayanamsa_ut);
+chk('get_ayanamsa_ex', s.get_ayanamsa_ex(2451545.0,s.SEFLG_SWIEPH), C.ayanamsa.get_ayanamsa_ex);
+chk('get_ayanamsa_ex_ut', s.get_ayanamsa_ex_ut(2451545.0,s.SEFLG_SWIEPH), C.ayanamsa.get_ayanamsa_ex_ut);
+chk('get_ayanamsa_name', s.get_ayanamsa_name(s.SE_SIDM_LAHIRI), C.ayanamsa.get_ayanamsa_name);
+
+// phenomena
+chk('pheno.phase_angle', s.pheno(2451545.0,s.SE_MOON,s.SEFLG_SWIEPH)?.[0], C.phenomena.pheno.phase_angle);
+chk('pheno_ut.phase_angle', s.pheno_ut(2451545.0,s.SE_MOON,s.SEFLG_SWIEPH)?.[0], C.phenomena.pheno_ut.phase_angle);
+const az = s.azalt(2451545.0, s.SE_EQU2HOR, [8.0,47.0,400.0], 1013.25, 15.0, [100.0,10.0,1.0]);
+chk('azalt.az', az.azimuth, C.phenomena.azalt.az); chk('azalt.alt', az.trueAltitude, C.phenomena.azalt.alt);
+const ar = s.azalt_rev(2451545.0, s.SE_HOR2EQU, [8.0,47.0,400.0], [az.azimuth, az.trueAltitude, az.apparentAltitude]);
+chk('azalt_rev.ra', ar.ra, C.phenomena.azalt_rev.ra); chk('azalt_rev.dec', ar.dec, C.phenomena.azalt_rev.dec);
+chk('refrac', s.refrac(10.0, 1013.25, 15.0, s.SE_TRUE_TO_APP), C.phenomena.refrac);
+chk('refrac_extended', s.refrac_extended(10.0, 400.0, 1013.25, 15.0, 0.0065, s.SE_TRUE_TO_APP).converted, C.phenomena.refrac_extended);
+
+// config
+chk('get_tid_acc', s.get_tid_acc(), C.config.get_tid_acc);
+
+// nodes
+chk('nod_aps.node_lon', s.nod_aps(2451545.0,s.SE_MOON,s.SEFLG_SWIEPH,s.SE_NODBIT_MEAN).asc_node, C.nodes.nod_aps.node_lon);
+chk('nod_aps_ut.node_lon', s.nod_aps_ut(2451545.0,s.SE_MOON,s.SEFLG_SWIEPH,s.SE_NODBIT_MEAN).asc_node, C.nodes.nod_aps_ut.node_lon);
+
+// strings
+chk('cs2timestr', s.cs2timestr(12.5,' ',true), C.strings.cs2timestr);
+chk('cs2lonlatstr', s.cs2lonlatstr(123.456,'E','W'), C.strings.cs2lonlatstr);
+chk('cs2degstr', s.cs2degstr(123.456), C.strings.cs2degstr);
+
+// version
+chk('version', s.version(), C.version);
+
+s.close();
+console.log(`\n=== JS(wasm) vs C reference ===`);
+console.log(`PASS ${pass}  FAIL ${fail}`);
+if (fails.length) { console.log('\nMISMATCHES:'); fails.forEach(f => console.log('  ✗ ' + f)); }
+process.exit(fail ? 1 : 0);

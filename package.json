@@ -26,7 +26,8 @@
     "test": "node tests/swisseph.test.js",
     "prepublishOnly": "node tests/swisseph.test.js",
     "demo": "python3 -m http.server 8000",
-    "docs": "echo 'Documentation available in DOCUMENTATION.md'"
+    "docs": "echo 'Documentation available in DOCUMENTATION.md'",
+    "verify": "bash verification/run_verification.sh"
   },
   "keywords": [
     "swiss-ephemeris",
