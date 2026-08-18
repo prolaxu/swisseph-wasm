@@ -52,11 +52,13 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
         with:
           version: latest
-      - name: Rebuild wasm from vendored source
+      - name: Rebuild wasm from vendored source (full + lite variants)
         run: bash tools/compile.sh
       - name: Report any drift vs committed wasm (informational)
         run: git --no-pager diff --stat -- wasm/ || true
-      - name: Tests against freshly built wasm
+      - name: Tests against freshly built wasm (includes the lite smoke test)
         run: npm test
+      - name: Report package size
+        run: npm pack --dry-run
       - name: JS-vs-C verification against freshly built wasm
         run: npm run verify
