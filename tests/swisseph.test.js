@@ -4,7 +4,7 @@
  * Bypasses Jest to avoid WASM module caching issues
  */
 
-import SwissEph from '../src/swisseph.js';
+import SwissEph, { SwissEphError } from '../src/swisseph.js';
 import { readFileSync } from 'fs';
 
 const TOLERANCE = 0.0001; // Realistic tolerance for astronomical calculations
@@ -31,6 +31,25 @@ function assertClose(actual, expected, message) {
 
 function assertEqual(actual, expected, message) {
   assert(actual === expected, `${message} (expected: ${expected}, got: ${actual})`);
+}
+
+// Asserts fn() throws a SwissEphError whose message mentions the C function.
+function assertThrows(fn, expectedMethod, message) {
+  let thrown = null;
+  try {
+    fn();
+  } catch (e) {
+    thrown = e;
+  }
+  if (!(thrown instanceof SwissEphError)) {
+    assert(false, `${message} (expected SwissEphError, got: ${thrown})`);
+    return null;
+  }
+  assert(
+    thrown.method === expectedMethod && thrown.message.includes(expectedMethod),
+    `${message} (${thrown.message})`
+  );
+  return thrown;
 }
 
 async function runTests() {
@@ -211,6 +230,22 @@ async function runTests() {
   catch (e) { assert(false, 'heliacal_pheno_ut threw: ' + e.message); }
   try { const vl = swisseph.vis_limit_mag(2451545.0, geo, datm, dobs, 'venus', swisseph.SEFLG_SWIEPH); assert(vl === null || vl instanceof Float64Array, 'vis_limit_mag callable'); }
   catch (e) { assert(false, 'vis_limit_mag threw: ' + e.message); }
+
+  console.log('\n🚨 Error handling');
+  assertThrows(() => swisseph.date_conversion(2000, 13, 45, 12.0, 'g'),
+    'swe_date_conversion', 'date_conversion rejects an invalid date');
+  assertThrows(() => swisseph.calc_ut(2451545.0, 99999, swisseph.SEFLG_SWIEPH),
+    'swe_calc_ut', 'calc_ut rejects an unknown planet id');
+  assertThrows(() => swisseph.calc(2451545.0, 99999, swisseph.SEFLG_SWIEPH),
+    'swe_calc', 'calc rejects an unknown planet id');
+  const starErr = assertThrows(() => swisseph.fixstar_ut('NoSuchStar', 2451545.0, swisseph.SEFLG_SWIEPH),
+    'swe_fixstar_ut', 'fixstar_ut rejects an unknown star');
+  assert(starErr !== null && starErr.code < 0, 'SwissEphError carries the C return code');
+  assert(swisseph.getLastError().length > 0, 'getLastError still reports the last failure');
+  assertThrows(() => swisseph.get_orbital_elements(2451545.0, 99999, swisseph.SEFLG_SWIEPH),
+    'swe_get_orbital_elements', 'get_orbital_elements rejects an unknown body');
+  assertThrows(() => swisseph.calc_pctr(2451545.0, 99999, swisseph.SE_EARTH, swisseph.SEFLG_SWIEPH),
+    'swe_calc_pctr', 'calc_pctr rejects an unknown body');
 
   console.log('\n' + '='.repeat(60));
   console.log(`\n📊 Test Results:`);
