@@ -4,6 +4,69 @@ All notable changes to this project are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/) (pre-1.0: breaking changes bump
 the minor version).
 
+## [0.2.0] - 2026-08-18
+
+Robustness and packaging release: one error convention, no heap leaks, and a
+lite build that drops the 2 MB ephemeris payload.
+
+### Breaking changes
+
+- **Every wrapper now throws `SwissEphError` when the C library reports an
+  error.** Methods that previously returned `null` (and stashed the message
+  for `getLastError()`) or `{ error: retFlag }` (`nod_aps`, `nod_aps_ut`) no
+  longer do. The error carries `message` (`swe_<name>: <serr text>`), `method`
+  (the C function name) and `code` (the C return flag). Replace null checks
+  with `try`/`catch`:
+
+  ```javascript
+  import SwissEph, { SwissEphError } from 'swisseph-wasm';
+
+  try {
+    const star = swe.fixstar_ut('Aldebaran', jd, swe.SEFLG_SWIEPH);
+  } catch (e) {
+    if (e instanceof SwissEphError) console.error(e.method, e.code, e.message);
+  }
+  ```
+
+- **`date_conversion`** throws `SwissEphError` on an invalid date instead of a
+  bare `Error('Invalid date')`. (Its old `this.ERR` check was dead code, so
+  invalid dates previously slipped through.)
+- **`getLastError()` is deprecated.** Throw paths still set it, so it keeps
+  working for this release; it will be removed in 0.3.0.
+- **The npm tarball no longer contains `docs/` and `examples/`.** Both remain
+  in the repository and on GitHub Pages.
+
+### Added
+
+- **Lite build**, exported as `swisseph-wasm/lite`. Same API, compiled without
+  the binary ephemeris files (`sepl_18.se1`, `semo_18.se1`, `seas_18.se1`), so
+  there is no `.data` file to fetch. Ephemeris flags default to
+  `SEFLG_MOSEPH`; accuracy is ~0.1″ instead of ~0.001″. `sefstars.txt`,
+  `seorbel.txt` and `seleapsec.txt` (~139 KB) are still bundled, so fixed
+  stars and orbital elements work. `tools/compile.sh` builds both variants.
+- **`initSwissEph({ wasmUrl, dataUrl, locateFile, wasmFactory })`** for
+  bundlers that hash or relocate assets (e.g. Vite `?url` imports). Without
+  options the previous resolution relative to `wasm/` is unchanged.
+- `swisseph-wasm/wasm/*` is exported, so those URLs can be imported directly.
+- Error-path tests (invalid date, unknown planet id, unknown fixed star,
+  unknown body) and a lite-build smoke test (`npm run test:lite`, skipped when
+  the lite artifact has not been built).
+
+### Fixed
+
+- **WASM heap leaks.** Every wrapper allocated its buffers by hand and freed
+  them on each return path; a throwing `ccall` leaked them for the lifetime of
+  the module. All ~62 buffer-using methods now go through a private
+  `#withBuffers()` helper that frees in a `finally` block. `_free` is now
+  called in exactly one place.
+
+### Packaging
+
+- `npm pack --dry-run`: 2.3 MB packed / 3.0 MB unpacked / 20 files →
+  2.2 MB / 2.9 MB / 11 files (before the lite artifacts are added by the
+  build; those add ~0.6 MB to the tarball and are never fetched by consumers
+  of the full entry point).
+
 ## [0.1.0] - 2026-07-21
 
 Correctness release. Every wrapped method is now verified against the genuine

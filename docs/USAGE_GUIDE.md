@@ -330,7 +330,9 @@ swe.close();
 ```
 
 ### 3. Error Handling
-Handle initialization and calculation errors:
+Handle initialization and calculation errors. Every method throws
+`SwissEphError` on a C-level failure — check `error.method` / `error.code` when
+you need to tell them apart:
 
 ```javascript
 async function robustCalculation() {

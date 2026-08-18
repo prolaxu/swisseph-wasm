@@ -22,6 +22,11 @@
   `set_ephe_path()`. Ephemeris files are bundled in `wasm/swisseph.data` and
   mounted at `/sweph`; `initSwissEph()` points the engine there automatically.
   No `set_ephe_path()` call is needed. Bundled date coverage ≈ 1800–2400 AD.
+- **Lite build**: `import SwissEph from 'swisseph-wasm/lite'` — same API, no
+  2 MB `.data` file, ephemeris flags default to `SEFLG_MOSEPH` (~0.1″ instead
+  of ~0.001″). `SEFLG_SWIEPH` throws there: the `.se1` files are absent.
+- **Bundler asset URLs**: `initSwissEph({ wasmUrl, dataUrl, locateFile })`
+  overrides where the `.wasm`/`.data` files are fetched from.
 - **House system** is a single-letter string (`'P'` Placidus, `'K'` Koch,
   `'W'` whole-sign, …), passed as-is.
 - **Angles are degrees** unless the `SEFLG_RADIANS` flag is set.
@@ -29,11 +34,13 @@
 
 ## Error handling
 
-- `calc` / `calc_ut` **throw** on error (message included).
-- Most other fallible methods **return `null`** (or `{ error }` for
-  `nod_aps`). After a null/`{error}`, call **`swe.getLastError()`** for the C
-  library's message (populated by `calc*`, `fixstar*`, `nod_aps*`,
-  `helio_cross*`; other methods may return `null` with an empty message).
+- Since 0.2.0 **every** fallible method **throws `SwissEphError`** when the C
+  library reports an error. Nothing returns `null` or `{ error }` any more.
+- `SwissEphError` has `.message` (`swe_<fn>: <C message>`), `.method` (the C
+  function name) and `.code` (the C return flag, when there was one).
+- `import SwissEph, { SwissEphError } from 'swisseph-wasm'` and wrap calls in
+  `try { ... } catch (e) { if (e instanceof SwissEphError) ... }`.
+- `swe.getLastError()` still returns the last C message but is **deprecated**.
 
 ## Return shapes (commonly mis-remembered)
 
@@ -41,14 +48,14 @@
   Cusps are `cusps[1]..cusps[12]` (index 0 unused). `ascmc[0]`=Ascendant, `[1]`=MC.
 - `calc(jd, ipl, flags)` → `{ longitude, latitude, distance, longitudeSpeed, latitudeSpeed, distanceSpeed }`.
 - `calc_ut(...)` → `Float64Array(6)` `[lon, lat, dist, lonSpeed, latSpeed, distSpeed]`.
-- `nod_aps(...)` → `{ ascending, descending, perihelion, aphelion, asc_node, desc_node, peri_lon, aphe_lon }` or `{ error }`.
+- `nod_aps(...)` → `{ ascending, descending, perihelion, aphelion, asc_node, desc_node, peri_lon, aphe_lon }`.
 - `refrac(inalt, atpress, attemp, calcFlag)` → number (converted altitude).
 - Eclipses/occultations: `*_where` → `{ retFlag, geopos, attr }`; `*_how` →
   `{ retFlag, attr }`; `*_when` / `*_when_glob` → `{ retFlag, tret }`;
   `*_when_loc` → `{ retFlag, tret, attr }`. `retFlag` carries `SE_ECL_*` bits;
   `tret[0]` is the event time.
 - `rise_trans(jd, ipl, starname, epheFlag, rsmi, geopos[lon,lat,alt], atpress, attemp)`
-  → `Float64Array` (event time in `[0]`) or null. `rsmi` = `SE_CALC_RISE` / `SE_CALC_SET` / `SE_CALC_MTRANSIT` / `SE_CALC_ITRANSIT`.
+  → `Float64Array` (event time in `[0]`); throws if the event does not occur. `rsmi` = `SE_CALC_RISE` / `SE_CALC_SET` / `SE_CALC_MTRANSIT` / `SE_CALC_ITRANSIT`.
 
 ## Minimal example
 

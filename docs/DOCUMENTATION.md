@@ -113,12 +113,35 @@ console.log(chart);
 
 ### Core Methods
 
-#### `initSwissEph()`
+#### `initSwissEph(options?)`
 Initializes the WebAssembly module. Must be called before using any other methods.
 
 ```javascript
 await swe.initSwissEph();
 ```
+
+`options` is only needed when a bundler moves or hashes the assets:
+
+| Option | Type | Purpose |
+| --- | --- | --- |
+| `wasmUrl` | `string` | Where to fetch the `.wasm` file from |
+| `dataUrl` | `string` | Where to fetch the `.data` file from (full build only) |
+| `locateFile` | `(path, prefix) => string \| undefined` | Full control; `undefined` falls back to the default |
+| `wasmFactory` | `Function` | A pre-loaded Emscripten module factory |
+
+```javascript
+import wasmUrl from 'swisseph-wasm/wasm/swisseph.wasm?url';   // Vite
+import dataUrl from 'swisseph-wasm/wasm/swisseph.data?url';
+
+await swe.initSwissEph({ wasmUrl, dataUrl });
+```
+
+##### Lite build
+
+`import SwissEph from 'swisseph-wasm/lite'` gives the same API from a build
+without the ~2 MB of `.se1` ephemeris files. Ephemeris flags default to
+`SEFLG_MOSEPH` (Moshier, ~0.1″ accuracy); `SEFLG_SWIEPH` throws there because
+the files are absent. See the README for the full comparison.
 
 #### `julday(year, month, day, hour)`
 Calculates Julian Day Number for a given date and time.
@@ -533,7 +556,8 @@ async function getFixedStarPosition(starName, year, month, day) {
   // Calculate fixed star position
   const starPos = swe.fixstar(starName, jd, swe.SEFLG_SWIEPH);
 
-  if (starPos) {
+  // Throws SwissEphError if the star is not in the catalog.
+  {
     const result = {
       name: starName,
       longitude: starPos[0],
@@ -545,9 +569,6 @@ async function getFixedStarPosition(starName, year, month, day) {
     swe.close();
     return result;
   }
-
-  swe.close();
-  return null;
 }
 
 // Usage
@@ -613,9 +634,9 @@ async function findNextSolarEclipse(startYear, startMonth, startDay) {
     0 // forward search
   );
 
-  // sol_eclipse_when_glob returns { retFlag, tret } (or null on error).
+  // sol_eclipse_when_glob returns { retFlag, tret }, or throws SwissEphError.
   // tret[0] = time of maximum eclipse; retFlag carries the SE_ECL_* type bits.
-  if (eclipse) {
+  {
     const eclipseDate = swe.revjul(eclipse.tret[0], swe.SE_GREG_CAL);
 
     swe.close();
@@ -627,9 +648,6 @@ async function findNextSolarEclipse(startYear, startMonth, startDay) {
             eclipse.retFlag & swe.SE_ECL_ANNULAR ? 'Annular' : 'Partial'
     };
   }
-
-  swe.close();
-  return null;
 }
 ```
 
@@ -670,6 +688,25 @@ async function calculateTopocentric(year, month, day, hour, latitude, longitude,
 
 ## Error Handling
 
+Every wrapper throws `SwissEphError` when the underlying C function reports a
+failure (since 0.2.0 — previously some methods returned `null` or `{ error }`).
+The error carries the C function name in `.method`, its return flag in `.code`,
+and the C library's message in `.message`.
+
+```javascript
+import SwissEph, { SwissEphError } from 'swisseph-wasm';
+
+try {
+  swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SWIEPH);
+} catch (error) {
+  if (error instanceof SwissEphError) {
+    console.error(error.method, error.code, error.message);
+  }
+}
+```
+
+`swe.getLastError()` still returns the most recent C message but is deprecated.
+
 ### Best Practices
 
 ```javascript
@@ -704,11 +741,8 @@ async function safeCalculation(year, month, day, hour) {
       throw new Error('Invalid Julian Day calculated');
     }
 
+    // Throws SwissEphError if the C library cannot compute the position.
     const result = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SWIEPH);
-
-    if (!result || result.length < 4) {
-      throw new Error('Failed to calculate planetary position');
-    }
 
     return {
       success: true,
