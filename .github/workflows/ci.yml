@@ -36,8 +36,12 @@ jobs:
           node-version: 22
       - name: Ensure gcc
         run: gcc --version
+      # --strict: a missing/broken C toolchain must fail here, not silently fall
+      # back to the committed reference. The tolerance is looser than the local
+      # default because the committed reference was produced by a different
+      # compiler and libm; real source changes move values far more than 1e-5.
       - name: JS-vs-C verification
-        run: npm run verify
+        run: npm run verify -- --strict --tolerance 1e-5
 
   # Rebuild wasm/ from source with the Emscripten toolchain, then run the full
   # suite against the freshly built binary. This makes the committed wasm/
@@ -61,4 +65,4 @@ jobs:
       - name: Report package size
         run: npm pack --dry-run
       - name: JS-vs-C verification against freshly built wasm
-        run: npm run verify
+        run: npm run verify -- --strict --tolerance 1e-5

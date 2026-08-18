@@ -54,6 +54,21 @@ lite build that drops the 2 MB ephemeris payload.
 
 ### Fixed
 
+- **`npm run verify` crashed and destroyed the committed reference.** The C
+  reference generator smashed its stack — `swe_pheno[_ut]` write 20 doubles
+  into a 6-element array, and `swe_fixstar*`/`swe_gauquelin_sector` need
+  `2 * SE_MAX_STNAME` bytes for the name they write back — so it aborted
+  partway through while its output was being redirected straight onto
+  `verification/reference.json`, truncating it. The generator now uses
+  correctly sized buffers, and the script writes to a temp file that is
+  validated before use; `reference.json` is only overwritten with
+  `--update-reference`.
+- **Fresh-vs-committed reference comparison is numeric, not a byte diff.** A
+  different compiler or libm moves the last digits (~1e-7 here), which was
+  reported as a failure. New `--tolerance` (default `1e-6`), `--skip-regen`
+  (no C toolchain needed) and `--strict` (CI) flags; a missing or broken
+  toolchain now warns and still runs the wasm comparison instead of aborting.
+
 - **WASM heap leaks.** Every wrapper allocated its buffers by hand and freed
   them on each return path; a throwing `ccall` leaked them for the lifetime of
   the module. All ~62 buffer-using methods now go through a private

@@ -10,7 +10,9 @@ int main() {
     double jd, result;
     int year, month, day, retval;
     double hour, xx[6], cusps[13], ascmc[10];
-    char serr[256], star[41], buf[256];
+    // swe_fixstar* write the resolved name back into `star`; swephexp.h
+    // requires twice SE_MAX_STNAME of room for it.
+    char serr[AS_MAXCH], star[2 * SE_MAX_STNAME], buf[AS_MAXCH];
     int32 gregflag = SE_GREG_CAL;
     
     printf("{\n");
@@ -189,11 +191,13 @@ int main() {
     // === Phenomena ===
     printf("  \"phenomena\": {\n");
     
-    retval = swe_pheno(2451545.0, SE_MOON, SEFLG_SWIEPH, xx, serr);
-    printf("    \"pheno\": {\"retval\": %d, \"phase_angle\": %.15f}", retval, xx[0]); print_comma();
-    
-    retval = swe_pheno_ut(2451545.0, SE_MOON, SEFLG_SWIEPH, xx, serr);
-    printf("    \"pheno_ut\": {\"retval\": %d, \"phase_angle\": %.15f}", retval, xx[0]); print_comma();
+    // swe_pheno[_ut] fills 20 doubles, not 6: it needs its own buffer.
+    double ph_attr[20];
+    retval = swe_pheno(2451545.0, SE_MOON, SEFLG_SWIEPH, ph_attr, serr);
+    printf("    \"pheno\": {\"retval\": %d, \"phase_angle\": %.15f}", retval, ph_attr[0]); print_comma();
+
+    retval = swe_pheno_ut(2451545.0, SE_MOON, SEFLG_SWIEPH, ph_attr, serr);
+    printf("    \"pheno_ut\": {\"retval\": %d, \"phase_angle\": %.15f}", retval, ph_attr[0]); print_comma();
     
     double geopos[3] = {8.0, 47.0, 400.0};
     double xin[3] = {100.0, 10.0, 1.0};
@@ -251,7 +255,7 @@ int main() {
     printf("    \"helio_cross\": {\"retval\": %d, \"jd\": %.15f}", hc_ret, hc_jd); print_comma();
 
     double gq_dgsect;
-    char gqname[41]; gqname[0] = '\0';
+    char gqname[2 * SE_MAX_STNAME]; gqname[0] = '\0';
     int32 gq_ret = swe_gauquelin_sector(2451545.0, SE_SUN, gqname, SEFLG_SWIEPH, 0, geopos, 1013.25, 15.0, &gq_dgsect, serr);
     printf("    \"gauquelin_sector\": {\"retval\": %d, \"sector\": %.15f}\n", gq_ret, gq_dgsect);
 
