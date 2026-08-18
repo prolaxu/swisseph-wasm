@@ -13,7 +13,10 @@
  *
  * Methods that take an ephemeris flag default it to SEFLG_MOSEPH, and add
  * SEFLG_MOSEPH when the flags you pass select no ephemeris at all. Explicitly
- * asking for SEFLG_SWIEPH still works but will fail: the files are not there.
+ * Passing SEFLG_SWIEPH explicitly is not an error: the C library silently
+ * falls back to Moshier when the .se1 files are absent, so you get the same
+ * numbers as the default with no warning. Do not rely on it to signal that
+ * you are on the lite build.
  *
  * @license GPL-3.0-or-later
  */

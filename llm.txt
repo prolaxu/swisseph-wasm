@@ -24,7 +24,7 @@
   No `set_ephe_path()` call is needed. Bundled date coverage ≈ 1800–2400 AD.
 - **Lite build**: `import SwissEph from 'swisseph-wasm/lite'` — same API, no
   2 MB `.data` file, ephemeris flags default to `SEFLG_MOSEPH` (~0.1″ instead
-  of ~0.001″). `SEFLG_SWIEPH` throws there: the `.se1` files are absent.
+  of ~0.001″). Asking for `SEFLG_SWIEPH` there silently falls back to Moshier.
 - **Bundler asset URLs**: `initSwissEph({ wasmUrl, dataUrl, locateFile })`
   overrides where the `.wasm`/`.data` files are fetched from.
 - **House system** is a single-letter string (`'P'` Placidus, `'K'` Koch,

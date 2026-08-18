@@ -84,6 +84,18 @@ async function runTests() {
       `${name}: lite longitude agrees with the Swiss ephemeris`);
   }
 
+  console.log('\n🚩 Ephemeris flag handling');
+  // No .se1 files: the C library falls back to Moshier instead of erroring,
+  // so an explicit SEFLG_SWIEPH returns the Moshier numbers, not a throw.
+  assertClose(lite.calc_ut(jd, lite.SE_SUN, lite.SEFLG_SWIEPH)[0],
+    lite.calc_ut(jd, lite.SE_SUN)[0], 1e-12,
+    'explicit SEFLG_SWIEPH falls back to Moshier');
+  // Flags that select no ephemeris get SEFLG_MOSEPH added rather than
+  // dropping to the library default.
+  const speed = lite.calc_ut(jd, lite.SE_SUN, lite.SEFLG_SPEED);
+  assert(speed.length === 6 && speed[3] > 0.9 && speed[3] < 1.1,
+    'SEFLG_SPEED alone still computes (daily motion ~1 deg)');
+
   console.log('\n⭐ Text data files are still bundled');
   const star = lite.fixstar_ut('Aldebaran', jd);
   assert(star instanceof Float64Array && star.length === 6,

@@ -473,7 +473,7 @@ The lite build omits `sepl_18.se1`, `semo_18.se1` and `seas_18.se1`, so position
 | Planet accuracy | ~0.001″ | ~0.1″ |
 | Date range | 1800–2400 AD (bundled files) | 3000 BC – 3000 AD |
 
-The API is identical. Methods that take an ephemeris flag (`calc`, `calc_ut`, `calc_pctr`, the `fixstar*` family, `nod_aps*`, `pheno*`, `get_orbital_elements`, `orbit_max_min_true_distance`, `get_ayanamsa_ex*`) default it to `SEFLG_MOSEPH`, and add `SEFLG_MOSEPH` when the flags you pass select no ephemeris. Passing `SEFLG_SWIEPH` explicitly throws, because the files are not there.
+The API is identical. Methods that take an ephemeris flag (`calc`, `calc_ut`, `calc_pctr`, the `fixstar*` family, `nod_aps*`, `pheno*`, `get_orbital_elements`, `orbit_max_min_true_distance`, `get_ayanamsa_ex*`) default it to `SEFLG_MOSEPH`, and add `SEFLG_MOSEPH` when the flags you pass select no ephemeris. Passing `SEFLG_SWIEPH` explicitly is not an error: with the `.se1` files absent the C library falls back to Moshier silently, so you get the same numbers as the default.
 
 ### Custom asset URLs (bundlers)
 
