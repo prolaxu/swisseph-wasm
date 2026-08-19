@@ -450,6 +450,44 @@ The bundled files are:
 
 > Note: `compile.sh` preloads each required data file explicitly (see the list above). The `seas_18.se1` asteroid-name file `seasnam.txt` (~9.5 MB) is intentionally **not** bundled, since no exported function reads it — this keeps `swisseph.data` small.
 
+### Lite build — 2 MB smaller, no `.se1` files
+
+The default build ships `wasm/swisseph.data` (~2.1 MB), which every consumer downloads. If you can trade a little precision for that, import the lite entry point instead:
+
+```javascript
+import SwissEph from 'swisseph-wasm/lite';
+
+const swisseph = new SwissEph();
+await swisseph.initSwissEph();          // no .data fetch
+
+const jd = swisseph.julday(2000, 1, 1, 12.0);
+const sun = swisseph.calc_ut(jd, swisseph.SE_SUN);   // flags default to SEFLG_MOSEPH
+```
+
+The lite build omits `sepl_18.se1`, `semo_18.se1` and `seas_18.se1`, so positions come from the built-in **Moshier** ephemeris. It still bundles `sefstars.txt`, `seorbel.txt` and `seleapsec.txt` (~139 KB total), so fixed stars, orbital elements and leap seconds keep working.
+
+| | Full (`swisseph-wasm`) | Lite (`swisseph-wasm/lite`) |
+| --- | --- | --- |
+| Data file | ~2.1 MB | none |
+| Ephemeris | Swiss (`SEFLG_SWIEPH`) | Moshier (`SEFLG_MOSEPH`) |
+| Planet accuracy | ~0.001″ | ~0.1″ |
+| Date range | 1800–2400 AD (bundled files) | 3000 BC – 3000 AD |
+
+The API is identical. Methods that take an ephemeris flag (`calc`, `calc_ut`, `calc_pctr`, the `fixstar*` family, `nod_aps*`, `pheno*`, `get_orbital_elements`, `orbit_max_min_true_distance`, `get_ayanamsa_ex*`) default it to `SEFLG_MOSEPH`, and add `SEFLG_MOSEPH` when the flags you pass select no ephemeris. Passing `SEFLG_SWIEPH` explicitly is not an error: with the `.se1` files absent the C library falls back to Moshier silently, so you get the same numbers as the default.
+
+### Custom asset URLs (bundlers)
+
+By default the `.wasm` and `.data` files are resolved next to the package's `wasm/` directory. Bundlers that hash or relocate assets can be pointed at the right URLs:
+
+```javascript
+import wasmUrl from 'swisseph-wasm/wasm/swisseph.wasm?url';   // Vite
+import dataUrl from 'swisseph-wasm/wasm/swisseph.data?url';
+
+await swisseph.initSwissEph({ wasmUrl, dataUrl });
+```
+
+For full control, pass `locateFile(path, prefix)`; returning `undefined` falls back to the default resolution.
+
 ## 🛠️ Building from source
 
 The prebuilt `wasm/` directory is committed, so **you do not need to build anything to use the library**. Rebuild only when you change the C sources, the bundled ephemeris data, or the exported function list.
@@ -480,8 +518,11 @@ The prebuilt `wasm/` directory is committed, so **you do not need to build anyth
 ```bash
 ./tools/init-dependency.sh    # preflight: verifies source, data and emcc are present
 ./tools/compile.sh            # compiles deps/swisseph -> wasm/swisseph.{js,wasm,data}
+                              # and the lite variant -> wasm/swisseph-lite.{js,wasm}
 npm test                # runs the test suite against the freshly built wasm/
 ```
+
+> The lite artifacts (`wasm/swisseph-lite.{js,wasm}`) must be built and committed like the full ones — `npm publish` refuses to run without them, since the `swisseph-wasm/lite` export would be dead.
 
 ### Changing the vendored Swiss Ephemeris version
 
@@ -728,22 +769,35 @@ node examples/birth-chart.js
 5. **Use appropriate flags** for your needs
 
 ### Error Handling
+
+Every method throws `SwissEphError` when the underlying C function reports a
+failure — no method returns `null` or `{ error }` (changed in 0.2.0). The error
+carries the C function name and its return flag:
+
 ```javascript
+import SwissEph, { SwissEphError } from 'swisseph-wasm';
+
 async function safeCalculation() {
-  let swe = null;
+  const swe = new SwissEph();
   try {
-    swe = new SwissEph();
     await swe.initSwissEph();
-    // calculations here
-    return result;
+    return swe.calc_ut(swe.julday(2000, 1, 1, 12), swe.SE_SUN, swe.SEFLG_SWIEPH);
   } catch (error) {
-    console.error('Calculation failed:', error);
-    return null;
+    if (error instanceof SwissEphError) {
+      // error.message -> "swe_calc_ut: <message from the C library>"
+      // error.method  -> "swe_calc_ut"
+      // error.code    -> the C return flag (negative)
+      console.error(`${error.method} failed (${error.code}):`, error.message);
+    }
+    throw error;
   } finally {
-    if (swe) swe.close();
+    swe.close();
   }
 }
 ```
+
+> `swe.getLastError()` still returns the most recent C message, but it is
+> deprecated — the thrown `SwissEphError` carries the same text.
 
 ## 📄 License
 

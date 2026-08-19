@@ -15,6 +15,9 @@ await swe.initSwissEph();
 swe.close(); // Always clean up
 ```
 
+Smaller alternative: `import SwissEph from 'swisseph-wasm/lite'` — same API, no
+2 MB `.data` file, Moshier ephemeris by default (~0.1″ accuracy).
+
 ## Essential Functions
 
 ### Date & Time
@@ -207,6 +210,9 @@ const version = swe.version();
 ```
 
 ## Error Handling Template
+
+Every method throws `SwissEphError` (exported alongside the default export)
+when the C library reports a failure; nothing returns `null`.
 
 ```javascript
 async function safeCalculation() {

@@ -71,9 +71,12 @@ declare module 'swisseph-wasm' {
     readonly SE_SPLIT_DEG_ZODIACAL: 8;
 
     /**
-     * Initialize the Swiss Ephemeris WebAssembly module
+     * Initialize the Swiss Ephemeris WebAssembly module.
+     *
+     * Pass `wasmUrl`/`dataUrl` when a bundler hashes the assets, e.g. with
+     * Vite: `import wasmUrl from 'swisseph-wasm/wasm/swisseph.wasm?url'`.
      */
-    initSwissEph(): Promise<void>;
+    initSwissEph(options?: SwissEphInitOptions): Promise<void>;
 
     /**
      * Calculate Julian Day Number
@@ -177,34 +180,34 @@ declare module 'swisseph-wasm' {
     set_topo(longitude: number, latitude: number, altitude: number): void;
 
     /**
-     * Calculate fixed star positions. Returns null on error.
+     * Calculate fixed star positions. Throws SwissEphError on error.
      */
-    fixstar(starname: string, jd: number, flags: number): Float64Array | null;
+    fixstar(starname: string, jd: number, flags: number): Float64Array;
 
     /**
-     * Calculate fixed star positions (UT). Returns null on error.
+     * Calculate fixed star positions (UT). Throws SwissEphError on error.
      */
-    fixstar_ut(starname: string, jd: number, flags: number): Float64Array | null;
+    fixstar_ut(starname: string, jd: number, flags: number): Float64Array;
 
     /**
-     * Get fixed star magnitude. Returns null on error.
+     * Get fixed star magnitude. Throws SwissEphError on error.
      */
-    fixstar_mag(starname: string): number | null;
+    fixstar_mag(starname: string): number;
 
     /**
-     * Calculate fixed star positions (faster catalog variant). Returns null on error.
+     * Calculate fixed star positions (faster catalog variant). Throws SwissEphError on error.
      */
-    fixstar2(starname: string, jd: number, flags: number): Float64Array | null;
+    fixstar2(starname: string, jd: number, flags: number): Float64Array;
 
     /**
-     * Calculate fixed star positions (faster catalog variant, UT). Returns null on error.
+     * Calculate fixed star positions (faster catalog variant, UT). Throws SwissEphError on error.
      */
-    fixstar2_ut(starname: string, jd: number, flags: number): Float64Array | null;
+    fixstar2_ut(starname: string, jd: number, flags: number): Float64Array;
 
     /**
-     * Get fixed star magnitude (faster catalog variant). Returns null on error.
+     * Get fixed star magnitude (faster catalog variant). Throws SwissEphError on error.
      */
-    fixstar2_mag(starname: string): number | null;
+    fixstar2_mag(starname: string): number;
 
     /**
      * Calculate house cusps and ascendant/mc points
@@ -249,24 +252,24 @@ declare module 'swisseph-wasm' {
     /**
      * Rise, set or transit time. `rsmi` selects the event (SE_CALC_RISE,
      * SE_CALC_SET, SE_CALC_MTRANSIT, SE_CALC_ITRANSIT). `starname` is '' for a
-     * planet. `geopos` = [lon, lat, alt]. Returns tret (time in tret[0]) or null.
+     * planet. `geopos` = [lon, lat, alt]. Returns tret (time in tret[0]); throws SwissEphError on error.
      */
-    rise_trans(jd: number, planet: number, starname: string, epheFlag: number, rsmi: number, geopos: number[], atpress: number, attemp: number): Float64Array | null;
+    rise_trans(jd: number, planet: number, starname: string, epheFlag: number, rsmi: number, geopos: number[], atpress: number, attemp: number): Float64Array;
 
     /**
      * As rise_trans but with an explicit horizon height (horhgt, degrees).
      */
-    rise_trans_true_hor(jd: number, planet: number, starname: string, epheFlag: number, rsmi: number, geopos: number[], atpress: number, attemp: number, horhgt: number): Float64Array | null;
+    rise_trans_true_hor(jd: number, planet: number, starname: string, epheFlag: number, rsmi: number, geopos: number[], atpress: number, attemp: number, horhgt: number): Float64Array;
 
     /**
-     * Phase, phase angle, elongation, apparent diameter and magnitude (ET). Returns null on error.
+     * Phase, phase angle, elongation, apparent diameter and magnitude (ET). Throws SwissEphError on error.
      */
-    pheno(jd: number, planet: number, flags: number): Float64Array | null;
+    pheno(jd: number, planet: number, flags: number): Float64Array;
 
     /**
-     * Phase and related data (UT). Returns null on error.
+     * Phase and related data (UT). Throws SwissEphError on error.
      */
-    pheno_ut(jd: number, planet: number, flags: number): Float64Array | null;
+    pheno_ut(jd: number, planet: number, flags: number): Float64Array;
 
     /**
      * Atmospheric refraction. `calcFlag` is SE_TRUE_TO_APP or SE_APP_TO_TRUE.
@@ -281,98 +284,98 @@ declare module 'swisseph-wasm' {
     refrac_extended(inalt: number, geoalt: number, atpress: number, attemp: number, lapseRate: number, calcFlag: number): RefracExtendedResult;
 
     /**
-     * Nodes and apsides (ET). Returns { error } on failure.
+     * Nodes and apsides (ET). Throws SwissEphError on failure.
      */
     nod_aps(jd: number, planet: number, flags: number, method: number): NodesApsidesResult;
 
     /**
-     * Nodes and apsides (UT). Returns { error } on failure.
+     * Nodes and apsides (UT). Throws SwissEphError on failure.
      */
     nod_aps_ut(jd: number, planet: number, flags: number, method: number): NodesApsidesResult;
 
     /**
-     * Osculating orbital elements (up to 50 values). Returns null on error.
+     * Osculating orbital elements (up to 50 values). Throws SwissEphError on error.
      */
-    get_orbital_elements(jd: number, planet: number, flags: number): Float64Array | null;
+    get_orbital_elements(jd: number, planet: number, flags: number): Float64Array;
 
     /**
-     * Max, min and true distance of a planet over its orbit. Returns null on error.
+     * Max, min and true distance of a planet over its orbit. Throws SwissEphError on error.
      */
-    orbit_max_min_true_distance(jd: number, planet: number, flags: number): OrbitDistance | null;
+    orbit_max_min_true_distance(jd: number, planet: number, flags: number): OrbitDistance;
 
     /**
-     * Heliacal rising/setting event times. Returns null on error.
+     * Heliacal rising/setting event times. Throws SwissEphError on error.
      * geoPos = [lon, lat, alt]; atmosData = [pressure, temp, humidity, meteoRange];
      * observerData = 6 observer parameters.
      */
-    heliacal_ut(jdStart: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, eventType: number, flags: number): Float64Array | null;
+    heliacal_ut(jdStart: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, eventType: number, flags: number): Float64Array;
 
     /**
-     * Heliacal phenomena details. Returns null on error.
+     * Heliacal phenomena details. Throws SwissEphError on error.
      */
-    heliacal_pheno_ut(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, eventType: number, heliacalFlag: number): Float64Array | null;
+    heliacal_pheno_ut(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, eventType: number, heliacalFlag: number): Float64Array;
 
     /**
-     * Visual limiting magnitude for an object. Returns null on error.
+     * Visual limiting magnitude for an object. Throws SwissEphError on error.
      */
-    vis_limit_mag(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, heliacalFlag: number): Float64Array | null;
+    vis_limit_mag(jd: number, geoPos: number[], atmosData: number[], observerData: number[], objectName: string, heliacalFlag: number): Float64Array;
 
     /**
      * Geographic position of greatest solar eclipse (geopos) plus attributes.
-     * Returns null on error.
+     * Throws SwissEphError on error.
      */
-    sol_eclipse_where(jd: number, flags: number): EclipseWhere | null;
+    sol_eclipse_where(jd: number, flags: number): EclipseWhere;
 
     /**
      * Geographic position of a lunar occultation plus attributes. `starName`
-     * is '' for a planet. Returns null on error.
+     * is '' for a planet. Throws SwissEphError on error.
      */
-    lun_occult_where(jd: number, planet: number, starName: string, flags: number): EclipseWhere | null;
+    lun_occult_where(jd: number, planet: number, starName: string, flags: number): EclipseWhere;
 
     /**
      * Solar eclipse attributes for a given observer. `geopos` = [lon, lat, alt].
-     * Returns null on error.
+     * Throws SwissEphError on error.
      */
-    sol_eclipse_how(jd: number, flags: number, geopos: number[]): EclipseHow | null;
+    sol_eclipse_how(jd: number, flags: number, geopos: number[]): EclipseHow;
 
     /**
      * Local circumstances of the next/previous solar eclipse for an observer.
-     * `geopos` = [lon, lat, alt]. Returns null on error.
+     * `geopos` = [lon, lat, alt]. Throws SwissEphError on error.
      */
-    sol_eclipse_when_loc(jdStart: number, flags: number, geopos: number[], backward: number): EclipseWhen | null;
+    sol_eclipse_when_loc(jdStart: number, flags: number, geopos: number[], backward: number): EclipseWhen;
 
     /**
      * Local circumstances of the next/previous lunar occultation for an observer.
-     * Returns null on error.
+     * Throws SwissEphError on error.
      */
-    lun_occult_when_loc(jdStart: number, planet: number, starName: string, flags: number, geopos: number[], backward: number): EclipseWhen | null;
+    lun_occult_when_loc(jdStart: number, planet: number, starName: string, flags: number, geopos: number[], backward: number): EclipseWhen;
 
     /**
-     * Global search for the next/previous solar eclipse. Returns null on error.
+     * Global search for the next/previous solar eclipse. Throws SwissEphError on error.
      */
-    sol_eclipse_when_glob(jdStart: number, flags: number, eclipseType: number, backward: number): EclipseTimes | null;
+    sol_eclipse_when_glob(jdStart: number, flags: number, eclipseType: number, backward: number): EclipseTimes;
 
     /**
-     * Global search for the next/previous lunar occultation. Returns null on error.
+     * Global search for the next/previous lunar occultation. Throws SwissEphError on error.
      */
-    lun_occult_when_glob(jdStart: number, planet: number, starName: string, flags: number, eclipseType: number, backward: number): EclipseTimes | null;
+    lun_occult_when_glob(jdStart: number, planet: number, starName: string, flags: number, eclipseType: number, backward: number): EclipseTimes;
 
     /**
      * Lunar eclipse attributes for a given observer. `geopos` = [lon, lat, alt].
-     * Returns null on error.
+     * Throws SwissEphError on error.
      */
-    lun_eclipse_how(jd: number, flags: number, geopos: number[]): EclipseHow | null;
+    lun_eclipse_how(jd: number, flags: number, geopos: number[]): EclipseHow;
 
     /**
-     * Global search for the next/previous lunar eclipse. Returns null on error.
+     * Global search for the next/previous lunar eclipse. Throws SwissEphError on error.
      */
-    lun_eclipse_when(jdStart: number, flags: number, eclipseType: number, backward: number): EclipseTimes | null;
+    lun_eclipse_when(jdStart: number, flags: number, eclipseType: number, backward: number): EclipseTimes;
 
     /**
      * Local circumstances of the next/previous lunar eclipse for an observer.
-     * `geopos` = [lon, lat, alt]. Returns null on error.
+     * `geopos` = [lon, lat, alt]. Throws SwissEphError on error.
      */
-    lun_eclipse_when_loc(jdStart: number, flags: number, geopos: number[], backward: number): EclipseWhen | null;
+    lun_eclipse_when_loc(jdStart: number, flags: number, geopos: number[], backward: number): EclipseWhen;
 
     /**
      * Set the ephemeris file search path (virtual filesystem path, e.g. 'sweph')
@@ -415,14 +418,14 @@ declare module 'swisseph-wasm' {
     get_ayanamsa_ut(jd: number): number;
 
     /**
-     * Ayanamsa with ephemeris flag (ET). Returns null on error.
+     * Ayanamsa with ephemeris flag (ET). Throws SwissEphError on error.
      */
-    get_ayanamsa_ex(jd: number, ephemerisFlag: number): number | null;
+    get_ayanamsa_ex(jd: number, ephemerisFlag: number): number;
 
     /**
-     * Ayanamsa with ephemeris flag (UT). Returns null on error.
+     * Ayanamsa with ephemeris flag (UT). Throws SwissEphError on error.
      */
-    get_ayanamsa_ex_ut(jd: number, ephemerisFlag: number): number | null;
+    get_ayanamsa_ex_ut(jd: number, ephemerisFlag: number): number;
 
     /**
      * Name of a sidereal (ayanamsa) mode
@@ -566,26 +569,26 @@ declare module 'swisseph-wasm' {
 
     /**
      * Julian Day (ET) when a planet crosses longitude x2cross heliocentrically.
-     * Returns null on error.
+     * Throws SwissEphError on error.
      */
-    helio_cross(planet: number, x2cross: number, jdET: number, flags: number, direction: number): number | null;
+    helio_cross(planet: number, x2cross: number, jdET: number, flags: number, direction: number): number;
 
     /**
      * Julian Day (UT) when a planet crosses longitude x2cross heliocentrically.
-     * Returns null on error.
+     * Throws SwissEphError on error.
      */
-    helio_cross_ut(planet: number, x2cross: number, jdUT: number, flags: number, direction: number): number | null;
+    helio_cross_ut(planet: number, x2cross: number, jdUT: number, flags: number, direction: number): number;
 
     /**
-     * Gauquelin sector position of a planet or star. Returns null on error.
+     * Gauquelin sector position of a planet or star. Throws SwissEphError on error.
      */
-    gauquelin_sector(t_ut: number, planet: number, starname: string, flags: number, method: number, geopos: number[], atpress: number, attemp: number): number | null;
+    gauquelin_sector(t_ut: number, planet: number, starname: string, flags: number, method: number, geopos: number[], atpress: number, attemp: number): number;
 
     /**
      * Planetocentric position: planet as seen from body `center`. Returns 6
-     * values (longitude, latitude, distance, and their speeds) or null on error.
+     * values (longitude, latitude, distance, and their speeds). Throws SwissEphError on error.
      */
-    calc_pctr(jd: number, planet: number, center: number, flags: number): Float64Array | null;
+    calc_pctr(jd: number, planet: number, center: number, flags: number): Float64Array;
 
     /**
      * Local apparent time to local mean time. Returns the resulting Julian Day.
@@ -629,8 +632,10 @@ declare module 'swisseph-wasm' {
 
     /**
      * The most recent error message from the underlying C library, or '' if the
-     * last call succeeded. Populated by methods that return null / { error } on
-     * failure (calc, calc_ut, fixstar*, nod_aps, helio_cross*).
+     * last call succeeded.
+     *
+     * @deprecated since 0.2.0 - every wrapper now throws {@link SwissEphError}
+     * carrying the same message. Kept for one release.
      */
     getLastError(): string;
 
@@ -638,6 +643,18 @@ declare module 'swisseph-wasm' {
      * Close Swiss Ephemeris and free memory
      */
     close(): void;
+  }
+
+  /**
+   * Thrown by every wrapper when the underlying C function reports a failure.
+   * `method` is the C function name (e.g. 'swe_calc_ut') and `code` is that
+   * function's return flag when one was available.
+   */
+  export class SwissEphError extends Error {
+    constructor(message: string, options?: { method?: string; code?: number });
+    name: 'SwissEphError';
+    method?: string;
+    code?: number;
   }
 
   /**
@@ -812,21 +829,18 @@ declare module 'swisseph-wasm' {
 
   /**
    * Nodes and apsides result. Each of the four arrays holds 6 doubles
-   * (position + speed). On error only `error` (the negative C return code) is
-   * present.
+   * (position + speed). Throws SwissEphError on failure.
    */
-  export type NodesApsidesResult =
-    | {
-        ascending: number[];
-        descending: number[];
-        perihelion: number[];
-        aphelion: number[];
-        asc_node: number;
-        desc_node: number;
-        peri_lon: number;
-        aphe_lon: number;
-      }
-    | { error: number };
+  export interface NodesApsidesResult {
+    ascending: number[];
+    descending: number[];
+    perihelion: number[];
+    aphelion: number[];
+    asc_node: number;
+    desc_node: number;
+    peri_lon: number;
+    aphe_lon: number;
+  }
 
   /**
    * Extended refraction result from refrac_extended
@@ -837,5 +851,59 @@ declare module 'swisseph-wasm' {
     apparentAltitude: number;
     refraction: number;
     dip: number;
+  }
+
+  /**
+   * Options for initSwissEph(). All are optional; without them the .wasm and
+   * .data files are resolved relative to the package's wasm/ directory.
+   */
+  export interface SwissEphInitOptions {
+    /** URL or path of the .wasm file. */
+    wasmUrl?: string;
+    /** URL or path of the .data file (full build only). */
+    dataUrl?: string;
+    /** Full control over asset resolution; return undefined to fall through. */
+    locateFile?: (path: string, prefix: string) => string | undefined;
+    /** A pre-loaded Emscripten module factory. */
+    wasmFactory?: (config: Record<string, unknown>) => Promise<unknown>;
+  }
+}
+
+/**
+ * Lite build: same API, without the ~2 MB of binary ephemeris files.
+ * Calculations default to the Moshier ephemeris (SEFLG_MOSEPH).
+ */
+declare module 'swisseph-wasm/lite' {
+  import SwissEph from 'swisseph-wasm';
+  import type {
+    NodesApsidesResult,
+    OrbitDistance,
+  } from 'swisseph-wasm';
+
+  export { SwissEphError } from 'swisseph-wasm';
+
+  export default class SwissEphLite extends SwissEph {
+    calc_ut(jd: number, planet: number, flags?: number): Float64Array;
+    calc(jd: number, planet: number, flags?: number): {
+      longitude: number;
+      latitude: number;
+      distance: number;
+      longitudeSpeed: number;
+      latitudeSpeed: number;
+      distanceSpeed: number;
+    };
+    calc_pctr(jd: number, planet: number, center: number, flags?: number): Float64Array;
+    fixstar(starname: string, jd: number, flags?: number): Float64Array;
+    fixstar_ut(starname: string, jd: number, flags?: number): Float64Array;
+    fixstar2(starname: string, jd: number, flags?: number): Float64Array;
+    fixstar2_ut(starname: string, jd: number, flags?: number): Float64Array;
+    pheno(jd: number, planet: number, flags?: number): Float64Array;
+    pheno_ut(jd: number, planet: number, flags?: number): Float64Array;
+    nod_aps(jd: number, planet: number, flags?: number, method?: number): NodesApsidesResult;
+    nod_aps_ut(jd: number, planet: number, flags?: number, method?: number): NodesApsidesResult;
+    get_orbital_elements(jd: number, planet: number, flags?: number): Float64Array;
+    orbit_max_min_true_distance(jd: number, planet: number, flags?: number): OrbitDistance;
+    get_ayanamsa_ex(jd: number, ephemerisFlag?: number): number;
+    get_ayanamsa_ex_ut(jd: number, ephemerisFlag?: number): number;
   }
 }

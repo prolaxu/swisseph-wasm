@@ -1,6 +1,6 @@
 {
   "name": "swisseph-wasm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "High-precision Swiss Ephemeris WebAssembly library for astronomical calculations in JavaScript",
   "type": "module",
   "main": "src/swisseph.js",
@@ -10,22 +10,26 @@
       "import": "./src/swisseph.js",
       "types": "./types/index.d.ts"
     },
+    "./lite": {
+      "import": "./src/swisseph-lite.js",
+      "types": "./types/index.d.ts"
+    },
+    "./wasm/*": "./wasm/*",
     "./package.json": "./package.json"
   },
   "files": [
     "src/",
     "wasm/",
     "types/",
-    "examples/",
-    "docs/",
     "README.md",
     "llm.txt",
     "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node tests/swisseph.test.js",
-    "prepublishOnly": "node tests/swisseph.test.js",
+    "test": "node tests/swisseph.test.js && node tests/swisseph-lite.test.js",
+    "test:lite": "node tests/swisseph-lite.test.js",
+    "prepublishOnly": "node tests/swisseph.test.js && SWISSEPH_REQUIRE_LITE=1 node tests/swisseph-lite.test.js",
     "demo": "python3 -m http.server 8000",
     "docs": "echo 'Docs in ./docs (start: docs/README.md). Live playground: https://prolaxu.github.io/swisseph-wasm/examples/playground.html'",
     "verify": "bash tools/run_verification.sh"
